@@ -2,7 +2,8 @@ import numpy as np
 import pickle
 import glob
 import pandas as pd
-import src.utils
+import utils
+import os
 
 def load_pickle(filename):
     with open(filename, 'rb') as file:
@@ -13,12 +14,15 @@ def save_pickle(filename,var):
     with open(filename, "wb") as file:
         pickle.dump(var, file)
 
+# Dynamic for the system the user is working on
 def get_drive(mouseID):
-    drive = '~/Documents/Maddy/processed_calcium_data'
+    cwd = os.getcwd()
+    drive = cwd[:-4]
+    print(drive)
     return drive
 
 def get_s2p_fld(mouseID,day):
-    drive=get_drive(mouseID)
+    drive = get_drive(mouseID)
     s2p_fld = f"{drive}/{mouseID}/{day}"
     return s2p_fld
 
@@ -28,24 +32,31 @@ def get_days(mouseID):
     days = [day.split('/')[-1] for day in day_paths]
     return days
 
-def load_cam_event_times(mouseID,day):
-    s2p_fld = get_s2p_fld(mouseID,day)
-    cam_time_fn = f"{s2p_fld}/cam_event_times.pkl"
+# camera data
+def load_cam_event_times(mouseID, day):
+    s2p_fld = get_s2p_fld(mouseID, day)
+    cam_time_fn = f"{s2p_fld}/camera/cam_event_times.pkl"
     event_times = load_pickle(cam_time_fn)
-    #get rid of None entries
+    # get rid of None entries
     filt_event_times = {k: v for k, v in event_times.items() if v is not None}
     return filt_event_times
 
-def load_event_labels(mouseID,day):
-    s2p_fld = get_s2p_fld(mouseID,day)
-    return np.load(f"{s2p_fld}/event_labels.npy")
+# camera data
+def load_event_labels(mouseID, day):
+    s2p_fld = get_s2p_fld(mouseID, day)
+    return np.load(f"{s2p_fld}/camera/event_labels.npy")
 
-def load_spks_and_events(mouseID,day):
+# calcium data
+def load_spks(mouseID, day):
+    s2p_fld = get_s2p_fld(mouseID, day)
+    spks = np.load(f"{s2p_fld}/calcium/cascade_spks.npy")
+    return spks
+
+# calcium data
+def load_cal_event_times(mouseID, day):
     s2p_fld = get_s2p_fld(mouseID,day)
-    spks = np.load(f"{s2p_fld}/cascade_spks.npy")
-    event_times = np.load(f"{s2p_fld}/calcium_event_times.npy")
-    event_labels = np.load(f"{s2p_fld}/event_labels.npy")
-    return spks, event_times, event_labels
+    event_times = np.load(f"{s2p_fld}/calcium/calcium_event_times.npy")
+    return event_times
 
 def load_hdf(file):
     df = pd.read_hdf(file)
@@ -74,14 +85,17 @@ def get_spks_for_beh(mouseID,day,beh,t_pre,t_post):
         beh_trials[:,:,trs_to_remove] = np.nan
     return beh_trials
 
+"""
+Loads the dataframe 
+"""
 def load_kinematics_df(key,mouseID,day):
     #key is of form time+event e.g.: '122634event005'
-    #/Documents/Maddy/dlc_files/20240210-094903_mouse49_event001_cam1DLC_resnet50_2pReachOct9shuffle1_500000.h5
+    #~/neuro-behavior-decoder/mouseID/20240210-094903_mouse49_event001_cam1DLC_resnet50_2pReachOct9shuffle1_500000.h5
     time = key[:6]
     event=key[6:]
     day = day[:4] #input as mm-dd-yy, need just mm-dd to match camera naming
-    fn_cam1 = glob.glob(f"~/Documents/Maddy/dlc_files/*{day}*{time}*{mouseID}*{event}*cam1*.h5")
-    fn_cam2 = glob.glob(f"~/Documents/Maddy/dlc_files/*{day}*{time}*{mouseID}*{event}*cam2*.h5")
+    fn_cam1 = glob.glob(f"~/neuro-behavior-decoder/{mouseID}/kinematics/*{day}*{time}*{mouseID}*{event}*cam1*.h5")
+    fn_cam2 = glob.glob(f"/home/Documents/Maddy/{mouseID}/kinematics/*{day}*{time}*{mouseID}*{event}*cam2*.h5")
     if (len(fn_cam1)>1) or (len(fn_cam2)>1):
         fn_cam1 = [fn for fn in fn_cam1 if not 'filtered' in fn]
         fn_cam2 = [fn for fn in fn_cam2 if not 'filtered' in fn]
@@ -90,6 +104,9 @@ def load_kinematics_df(key,mouseID,day):
     df_cam2 = load_hdf(fn_cam2[0])
     return df_cam1,df_cam2
 
+"""
+Cuts off x and y values that are lower then a certain liklihood within a given dataframe. 
+"""
 def get_x_y(df,bp,pcutoff):
     prob = df.xs(
         (bp, "likelihood"), level=(-2, -1), axis=1
@@ -137,14 +154,3 @@ def load_kinematics_per_trial(df,cam_event_times,duration,bodyparts,pcutoff):
         kin_trials[s,:] = kin_mat[:,start:start+duration].flatten()
     #assert np.ma.max(kin_trials)<1450, f'{np.ma.max(kin_trials)}'
     return kin_trials
-
-def load_all_event_kinematics_per_trial(df_cam1,df_cam2,mouseID,cam_event_times,duration,bodyparts,pcutoff):
-    keys = sorted(cam_event_times.keys())
-    for key in keys:
-        df_cam1, df_cam2 = load_kinematics_df(key,mouseID)
-        if (key==keys[0]) or (key==keys[-1]):
-            load_kinematics_per_trial(df_cam1,cam_event_times[key],duration,bodyparts,pcutoff)
-        
-        #now get the kinematics in a stacked array with one row per trial
-        kin_all_trials_cam1 += list(load_kinematics_per_trial(df_cam1,cam_event_times[key],duration,bodyparts,pcutoff))
-        kin_all_trials_cam2 += list(load_kinematics_per_trial(df_cam2,cam_event_times[key],duration,bodyparts,pcutoff))
