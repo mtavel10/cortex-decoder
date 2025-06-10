@@ -52,13 +52,9 @@ for mouseID in mice:
         interpolate_mouse_data(mouseID, day)
 """
 
+# calcium data retrievals work
 
-cam_event_times = io.load_cam_event_times("mouse49", "061025")
-print(cam_event_times)
-
-event_labels = io.load_event_labels("mouse49", "061025")
-print()
-print(event_labels)
-
-cal_event_times = io.load_cal_event_times("mouse49", "061025")
-print(cal_event_times)
+# get kinematic data retrievals to work
+camdf1, camdf2 = io.load_kinematics_df("133901event001", "mouse25", "20240425")
+print(camdf1.shape)
+print(camdf1)

@@ -58,48 +58,42 @@ def load_cal_event_times(mouseID, day):
     event_times = np.load(f"{s2p_fld}/calcium/calcium_event_times.npy")
     return event_times
 
+# kinematic data
+
 def load_hdf(file):
     df = pd.read_hdf(file)
     return df
 
-def get_spks_for_beh(mouseID,day,beh,t_pre,t_post):
-    '''spks with shape: n_neurons x n_timepts x n_trials'''
-    s2p_fld = get_s2p_fld(mouseID,day)
-    spks = np.load(s2p_fld+'/cascade_spks.npy')
-    event_times = np.load(s2p_fld + 'calcium_event_times.npy')
-    event_labels = np.load(s2p_fld + 'event_labels.npy').astype(int)
-    beh_labels = src.utils.get_labels_for_behavior(event_labels,beh)
-    beh_times = event_times[beh_labels]
-    beh_trials = np.zeros((spks.shape[0],t_pre+t_post,np.sum(beh_labels)))
-    trs_to_remove = []
-    for i,t in enumerate(beh_times.astype(int)):
-        if (t+t_post < (spks.shape[1]-32)) and (t-t_pre > 32):
-            beh_trials[:,:,i] = spks[:,(t-t_pre):(t+t_post)]
-        else:
-            trs_to_remove+=[i]
-    #flag trials before or after cascade edge effects - set to nan
-    #first check that there aren't nans in beh_trials for other reasons
-    #assert not np.any(np.isnan(beh_trials)), 'nans in spks'
-    if len(trs_to_remove)>=1:
-        print(f'setting {trs_to_remove} to nan because of cascade edge effects')
-        beh_trials[:,:,trs_to_remove] = np.nan
-    return beh_trials
-
-"""
-Loads the dataframe 
-"""
 def load_kinematics_df(key,mouseID,day):
-    #key is of form time+event e.g.: '122634event005'
-    #~/neuro-behavior-decoder/mouseID/20240210-094903_mouse49_event001_cam1DLC_resnet50_2pReachOct9shuffle1_500000.h5
+    """
+    Load kinematics data from two camera views for a specific behavioral event.
+    
+    Parameters
+        key : str
+            Combined time+event identifier (e.g., '122634event005')
+        mouseID : str
+            Mouse identifier
+        day : str
+            Date in yyyymmdd
+        
+    Returns
+        tuple
+            (df_cam1, df_cam2) - DataFrames containing pose data from both cameras
+    """
     time = key[:6]
-    event=key[6:]
-    day = day[:4] #input as mm-dd-yy, need just mm-dd to match camera naming
-    fn_cam1 = glob.glob(f"~/neuro-behavior-decoder/{mouseID}/kinematics/*{day}*{time}*{mouseID}*{event}*cam1*.h5")
-    fn_cam2 = glob.glob(f"/home/Documents/Maddy/{mouseID}/kinematics/*{day}*{time}*{mouseID}*{event}*cam2*.h5")
+    event = key[6:]
+    s2p_fld = get_s2p_fld(mouseID, day)
+    
+    # searches for filenames with these substrings
+    fn_cam1 = glob.glob(f"{s2p_fld}/kinematics/*{day}*{time}*{mouseID}*{event}*cam1*.h5")
+    fn_cam2 = glob.glob(f"{s2p_fld}/kinematics/*{day}*{time}*{mouseID}*{event}*cam2*.h5")
+
+    # checks if there is more than one kinematic file with these identifiers
     if (len(fn_cam1)>1) or (len(fn_cam2)>1):
-        fn_cam1 = [fn for fn in fn_cam1 if not 'filtered' in fn]
+        fn_cam1 = [fn for fn in fn_cam1 if not 'filtered' in fn] 
         fn_cam2 = [fn for fn in fn_cam2 if not 'filtered' in fn]
     assert (len(fn_cam1)==1) and (len(fn_cam2)==1), f'more than one kin file in {fn_cam1} or {fn_cam2}'
+    
     df_cam1 = load_hdf(fn_cam1[0])
     df_cam2 = load_hdf(fn_cam2[0])
     return df_cam1,df_cam2
