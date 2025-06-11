@@ -34,14 +34,6 @@ def interpolate_mouse_data(mouseID, day) -> np.ndarray:
     interpolated_camera = np.interp(x, cam_event_times, kinematics)
     interpolated_labels = np.interp(x, cam_event_times, event_labels)
 
-    print("For ", mouseID, ": Day: ", day)
-    print("Calcium event times: ")
-    print(calcium_event_times)
-    print("Event labels: ")
-    print(event_labels)
-    print("Camera event times: ")
-    print(cam_event_times)
-
 # Tracks mouse data and dates imported onto this file system (in prog)
 # Figure out a way to not have to do this manually (read off directory??)
 mice:list[str] = ['mouse49']
@@ -60,13 +52,38 @@ day = "20240425"
 spks = io.load_spks(mouse, day)
 cal_event_times = io.load_cal_event_times(mouse, day)
 cal_tseries = io.load_tseries(mouse, day, "calcium")
-print("Calcium time series:" , cal_tseries)
 
 # kinematic data
 camdf1, camdf2 = io.load_kinematics_df("133901event001", "mouse25", "20240425")
 bodyparts = io.get_bodyparts(camdf1)
 cam1_matrix = io.load_kinematics_matrix(camdf1, bodyparts, 0.4)
 
+# Get the average x and y coordinates across all bodyparts
 cam1_avg_coordinates = io.get_avg_coordinates(cam1_matrix, bodyparts) # maybe later ill modify this function to compute a weighted average
+print(cam1_avg_coordinates.shape)
+cam1_x_avg = cam1_avg_coordinates[:, 0]
+print(cam1_x_avg.shape)
+cam1_y_avg = cam1_avg_coordinates[:, 1]
+
+# Get the time frames
 cam_tseries = io.load_tseries(mouse, day, "cam")
-print("Camera time series:" , cam_tseries)
+
+# print("kin start time: ", cam_tseries[0])
+# print("cal start time: ", cal_tseries[0])
+camera_frames = len(cam_tseries)
+loc_frames = len(cam1_x_avg)
+
+print(camera_frames)
+print(loc_frames)
+
+min_frames= min(camera_frames, loc_frames)
+print(min_frames)
+
+cam1_x_avg = cam1_x_avg[:min_frames] # Resizing the camera frames to match the camera time series
+cam1_y_avg = cam1_y_avg[:min_frames]
+cam_tseries = cam_tseries[:min_frames]
+
+cam1_x_avg_interp = np.interp(cal_tseries, cam_tseries, cam1_x_avg)
+print(cam1_x_avg)
+print(cam1_x_avg_interp)
+# cam2_y_avg_interp = np.interp(cal_tseries, cam_tseries, cam1_y_avg)
