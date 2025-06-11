@@ -2,7 +2,7 @@ import numpy as np
 import pickle
 import glob
 import pandas as pd
-import utils
+import src.utils
 import os
 
 def load_pickle(filename):
@@ -17,9 +17,7 @@ def save_pickle(filename,var):
 # Dynamic for the system the user is working on
 def get_drive(mouseID):
     cwd = os.getcwd()
-    drive = cwd[:-4]
-    print(drive)
-    return drive
+    return cwd
 
 def get_s2p_fld(mouseID,day):
     drive = get_drive(mouseID)
@@ -59,7 +57,6 @@ def load_cal_event_times(mouseID, day):
     return event_times
 
 # kinematic data
-
 def load_hdf(file):
     df = pd.read_hdf(file)
     return df
@@ -98,10 +95,16 @@ def load_kinematics_df(key,mouseID,day):
     df_cam2 = load_hdf(fn_cam2[0])
     return df_cam1,df_cam2
 
-"""
-Cuts off x and y values that are lower then a certain liklihood within a given dataframe. 
-"""
+def get_bodyparts(df):
+    # Extract level 1 (bodyparts) and get unique values
+    bodyparts = df.columns.get_level_values('bodyparts').unique().tolist()
+    return sorted(bodyparts)
+
+
 def get_x_y(df,bp,pcutoff):
+    """
+    Cuts off x and y values that are lower then a certain liklihood within a given dataframe. 
+    """
     prob = df.xs(
         (bp, "likelihood"), level=(-2, -1), axis=1
     ).values.squeeze()
@@ -117,17 +120,89 @@ def get_x_y(df,bp,pcutoff):
     return temp_x, temp_y
 
 def load_kinematics_matrix(df,bodyparts,pcutoff):
-    #shape: bodyparts*2 x time (x and y cat)
-    x,y = get_x_y(df,'wrist',pcutoff)
-    kinematics_all = np.ma.masked_all([2*len(bodyparts),x.shape[0]])
+    """
+    This function cstacks the x locations for each bodypart on top of the y locations. 
+    Ex: 
+                Frame: 0    1    2    3    4
+    Row 0 (wrist_X): [120, 125, 130, 135, 140]
+    Row 1 (elbow_X): [100, 105, 110, 115, 120] 
+    Row 2 (d2tip_X): [150, 155, 160, 165, 170]
+        ──────────────────────────────────────
+    Row 3 (wrist_Y): [200, 205, 210, 215, 220]
+    Row 4 (elbow_Y): [180, 185, 190, 195, 200]
+    Row 5 (d2tip_Y): [220, 225, 230, 235, 240]
+
+    Returns:
+        numpy.ma.MaskedArray
+            Masked array of shape (2*len(bodyparts), n_timepoints)
+            First len(bodyparts) rows are x coordinates
+            Last len(bodyparts) rows are y coordinates
+            Low-confidence points are masked based on pcutoff
+    """
+    # Get initial for result matrix
+    x_ref, y_ref = get_x_y(df,'wrist',pcutoff)
+    n_timepoints = x_ref.shape[0]
     n_parts = len(bodyparts)
-    for j,k in enumerate(bodyparts):
-        x,y = get_x_y(df,k,pcutoff)
-        #assert (np.ma.max(x)<1450) and (np.ma.max(y)<1100), f'{np.ma.max(x)} {np.ma.max(y)}'
-        kinematics_all[j,:] = x #src.utils.low_pass_filt(x,10) NOTE: lfilter doesn't handle masked arrays properly - revise if you decide to filter
-        kinematics_all[n_parts+j,:] = y  #src.utils.low_pass_filt(y,10)
-    #assert np.ma.max(kinematics_all)<1450, f'{np.ma.max(kinematics_all)} {np.ma.max(x)}'
+
+    kinematics_all = np.ma.masked_all([2 * n_parts, n_timepoints])
+    # Fill in x, y coordinates for each bodypart
+    for j, bodypart in enumerate(bodyparts):
+        x, y = get_x_y(df, bodypart, pcutoff)
+        kinematics_all[j,:] = x 
+        kinematics_all[n_parts+j,:] = y
+    
     return kinematics_all
+
+def get_bodypart_coordinates(kinematics_matrix, bodyparts, part):
+    """
+    Helper function to extract x,y coordinates for a specific bodypart from kinematics matrix.
+    
+    Parameters:
+        kinematics_matrix : numpy.ma.MaskedArray
+            Output from load_kinematics_matrix
+        bodyparts : list
+            List of bodyparts
+        part : str
+            The specific bodypart you want to locate
+        
+    Returns:
+        tuple
+            (x_coords, y_coords) as masked arrays
+    """
+    bodypart_idx = bodyparts.index(part)
+    x_coords = kinematics_matrix[bodypart_idx, :]
+    y_coords = kinematics_matrix[len(bodyparts) + bodypart_idx, :]
+    return x_coords, y_coords
+
+def get_avg_coordinates(kinematics_matrix, bodyparts):
+    """
+    Collapses the locations of each bodypart into an "average" location.
+    Idea: weight certain bodyparts over others? 
+    
+    Parameters: 
+        kinematics_matrix : numpy.ma.MaskedArray
+        bodyparts : list of bodyparts
+    Returns:
+        np.NDArray
+            Average xy coordinates (tuple) for each timepoint
+    """
+    n_parts = len(bodyparts)
+    
+    # Extract X and Y coordinate matrices
+    x_coords = kinematics_matrix[:n_parts, :]  # Shape: (n_bodyparts, n_timepoints)
+    y_coords = kinematics_matrix[n_parts:, :]  # Shape: (n_bodyparts, n_timepoints)
+    
+    # Compute mean across bodyparts (axis=0) for each timepoint
+    x_avg = np.ma.median(x_coords, axis=0)  # Shape: (n_timepoints,)
+    y_avg = np.ma.median(y_coords, axis=0)  # Shape: (n_timepoints,)
+    
+    # Stack into (n_timepoints, 2) array
+    avg_coordinates = np.column_stack((x_avg, y_avg))
+    
+    return avg_coordinates
+
+
+
 
 def load_kinematics_per_bodypart(df,reach_starts,duration,bodyparts,pcutoff,do_filt=False):
     #for a given h5 file based df, get an n bodyparts x n_timepoints x n_reaches matrix per bodypart
@@ -135,16 +210,15 @@ def load_kinematics_per_bodypart(df,reach_starts,duration,bodyparts,pcutoff,do_f
     kin_y = np.zeros([len(bodyparts),duration,reach_starts.shape[0]])
     for i,bp in enumerate(bodyparts):
         x,y = get_x_y(df,bp,pcutoff)
-        for j,start in enumerate(reach_starts):
-            kin_x[i,:,j] = x[start:start+duration]
-            kin_y[i,:,j] = y[start:start+duration]
-    return kin_x,kin_y
-
-def load_kinematics_per_trial(df,cam_event_times,duration,bodyparts,pcutoff):
-    #kinematics with one long row vector per trial (for 1 cam)
-    kin_mat = load_kinematics_matrix(df,bodyparts,pcutoff)
-    kin_trials = np.ma.masked_all([cam_event_times.shape[0],len(bodyparts)*2*duration])
+        for j,start in enumerate(calciumtrix(df,bodyparts,pcutoff)):
+            kin_trials = np.ma.masked_all([cam_event_times.shape[0],len(bodyparts)*2*duration])
     for s,start in enumerate(cam_event_times):
         kin_trials[s,:] = kin_mat[:,start:start+duration].flatten()
     #assert np.ma.max(kin_trials)<1450, f'{np.ma.max(kin_trials)}'
     return kin_trials
+
+# Time series retrieval - will modify file path search with glob once we have concatenated files
+def load_tseries(mouseID, day, type):
+    # type: either "calcium" or "cam"
+    s2p_fld = get_s2p_fld(mouseID, day)
+    return np.load(f"{s2p_fld}/tseries/TSeries-04252024-0944-1316_{type}_frame_timestamps.npy")
