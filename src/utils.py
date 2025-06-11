@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
 from scipy.signal import butter, lfilter, freqz
-import IO
+import src.IO as io
 
 def curate_spks(spks,dF):
     '''first test: if the spk count estimates contain huge values, that 

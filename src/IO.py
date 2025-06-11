@@ -10,25 +10,29 @@ def load_pickle(filename):
         data = pickle.load(file)
     return data
 
+
 def save_pickle(filename,var):
     with open(filename, "wb") as file:
         pickle.dump(var, file)
 
-# Dynamic for the system the user is working on
+
 def get_drive(mouseID):
     cwd = os.getcwd()
     return cwd
+
 
 def get_s2p_fld(mouseID,day):
     drive = get_drive(mouseID)
     s2p_fld = f"{drive}/{mouseID}/{day}"
     return s2p_fld
 
+
 def get_days(mouseID):
     drive = get_drive(mouseID)
     day_paths = sorted(glob.glob(drive+mouseID+'/*24'))
     days = [day.split('/')[-1] for day in day_paths]
     return days
+
 
 # camera data
 def load_cam_event_times(mouseID, day):
@@ -39,10 +43,11 @@ def load_cam_event_times(mouseID, day):
     filt_event_times = {k: v for k, v in event_times.items() if v is not None}
     return filt_event_times
 
-# camera data
+
 def load_event_labels(mouseID, day):
     s2p_fld = get_s2p_fld(mouseID, day)
     return np.load(f"{s2p_fld}/camera/event_labels.npy")
+
 
 # calcium data
 def load_spks(mouseID, day):
@@ -50,16 +55,18 @@ def load_spks(mouseID, day):
     spks = np.load(f"{s2p_fld}/calcium/cascade_spks.npy")
     return spks
 
-# calcium data
+
 def load_cal_event_times(mouseID, day):
     s2p_fld = get_s2p_fld(mouseID,day)
     event_times = np.load(f"{s2p_fld}/calcium/calcium_event_times.npy")
     return event_times
 
+
 # kinematic data
 def load_hdf(file):
     df = pd.read_hdf(file)
     return df
+
 
 def load_kinematics_df(key,mouseID,day):
     """
@@ -95,6 +102,7 @@ def load_kinematics_df(key,mouseID,day):
     df_cam2 = load_hdf(fn_cam2[0])
     return df_cam1,df_cam2
 
+
 def get_bodyparts(df):
     # Extract level 1 (bodyparts) and get unique values
     bodyparts = df.columns.get_level_values('bodyparts').unique().tolist()
@@ -118,6 +126,7 @@ def get_x_y(df,bp,pcutoff):
         mask=mask,
     )
     return temp_x, temp_y
+
 
 def load_kinematics_matrix(df,bodyparts,pcutoff):
     """
@@ -153,6 +162,7 @@ def load_kinematics_matrix(df,bodyparts,pcutoff):
     
     return kinematics_all
 
+
 def get_bodypart_coordinates(kinematics_matrix, bodyparts, part):
     """
     Helper function to extract x,y coordinates for a specific bodypart from kinematics matrix.
@@ -173,6 +183,7 @@ def get_bodypart_coordinates(kinematics_matrix, bodyparts, part):
     x_coords = kinematics_matrix[bodypart_idx, :]
     y_coords = kinematics_matrix[len(bodyparts) + bodypart_idx, :]
     return x_coords, y_coords
+
 
 def get_avg_coordinates(kinematics_matrix, bodyparts):
     """
@@ -202,23 +213,19 @@ def get_avg_coordinates(kinematics_matrix, bodyparts):
     return avg_coordinates
 
 
-
-
-def load_kinematics_per_bodypart(df,reach_starts,duration,bodyparts,pcutoff,do_filt=False):
-    #for a given h5 file based df, get an n bodyparts x n_timepoints x n_reaches matrix per bodypart
-    kin_x = np.zeros([len(bodyparts),duration,reach_starts.shape[0]])
-    kin_y = np.zeros([len(bodyparts),duration,reach_starts.shape[0]])
-    for i,bp in enumerate(bodyparts):
-        x,y = get_x_y(df,bp,pcutoff)
-        for j,start in enumerate(calciumtrix(df,bodyparts,pcutoff)):
-            kin_trials = np.ma.masked_all([cam_event_times.shape[0],len(bodyparts)*2*duration])
-    for s,start in enumerate(cam_event_times):
-        kin_trials[s,:] = kin_mat[:,start:start+duration].flatten()
-    #assert np.ma.max(kin_trials)<1450, f'{np.ma.max(kin_trials)}'
-    return kin_trials
-
 # Time series retrieval - will modify file path search with glob once we have concatenated files
 def load_tseries(mouseID, day, type):
-    # type: either "calcium" or "cam"
+    """
+    Loads time stamp data.
+    Parameters
+        mouseID
+        day
+        type
+            either "calcium" or "cam" to specify the frame type for this series
+    Returns
+        numpy np.array
+            Seconds since Unix Epoch (float) per camera frame
+    """
     s2p_fld = get_s2p_fld(mouseID, day)
-    return np.load(f"{s2p_fld}/tseries/TSeries-04252024-0944-1316_{type}_frame_timestamps.npy")
+    tseries = np.load(f"{s2p_fld}/tseries/TSeries-04252024-0944-1316_{type}_frame_timestamps.npy")
+    return tseries.astype('datetime64[s]').astype(float)
