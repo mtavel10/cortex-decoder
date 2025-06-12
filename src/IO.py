@@ -88,15 +88,21 @@ def load_kinematics_df(key,mouseID,day):
     event = key[6:]
     s2p_fld = get_s2p_fld(mouseID, day)
     
-    # searches for filenames with these substrings
+    # Search for filenames with these substrings
     fn_cam1 = glob.glob(f"{s2p_fld}/kinematics/*{day}*{time}*{mouseID}*{event}*cam1*.h5")
     fn_cam2 = glob.glob(f"{s2p_fld}/kinematics/*{day}*{time}*{mouseID}*{event}*cam2*.h5")
+    
+    # Filter out 'filtered' files from both cameras
+    fn_cam1 = [fn for fn in fn_cam1 if 'filtered' not in fn]
+    fn_cam2 = [fn for fn in fn_cam2 if 'filtered' not in fn]
 
-    # checks if there is more than one kinematic file with these identifiers
-    if (len(fn_cam1)>1) or (len(fn_cam2)>1):
-        fn_cam1 = [fn for fn in fn_cam1 if not 'filtered' in fn] 
-        fn_cam2 = [fn for fn in fn_cam2 if not 'filtered' in fn]
-    assert (len(fn_cam1)==1) and (len(fn_cam2)==1), f'more than one kin file in {fn_cam1} or {fn_cam2}'
+    # Check if no kinematic files found
+    if len(fn_cam1) == 0 or len(fn_cam2) == 0:
+        raise FileNotFoundError(f"No kinematic files found - cam1: {len(fn_cam1)} files, cam2: {len(fn_cam2)} files")
+
+    # Check if more than one kinematic file found for either camera
+    if len(fn_cam1) > 1 or len(fn_cam2) > 1:
+        raise AssertionError(f"More than one kinematic file found - cam1: {fn_cam1}, cam2: {fn_cam2}")
     
     df_cam1 = load_hdf(fn_cam1[0])
     df_cam2 = load_hdf(fn_cam2[0])
