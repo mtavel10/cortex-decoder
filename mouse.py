@@ -30,13 +30,14 @@ class MouseDay:
 
         _cal_spks : numpy.ndarray 
 
-        # ask Gabriella how we can change the storage
         _kin_dfs : list[tuple[pandas.core.frame.DataFrame, pandas.core.frame.DataFrame]]
             List of 2.5 minute chunks, each chunk has 2 dfs for the 2 camera views
         _kin_mats : list[tuple[numpy.nparray, numpy.nparray]]
             Matrix versions of the dataframes, better for computations
 
     """
+    bodyparts = ['d1middle', 'd2tip', 'd2middle', 'd2knuckle', 'd3tip', 'd3middle',	'd3knuckle', 'd4tip', 'd4middle', 'wrist', 'wrist_outer', 'elbow', 'elbow_crook', 'pellet', 'pedestal', 'p2d1tip']
+
 
     def __init__(self, mouseID, day):
         self.mouseID : str = mouseID
@@ -52,25 +53,18 @@ class MouseDay:
 
         self._cal_spks = io.load_spks(mouseID, day)
 
-        self._kin_dfs = []
+        self._kin_dfs = {}
         for key in self.kin_event_times:
-            self._kin_dfs.append(io.load_kinematics_df(key, mouseID, day))
-    
-        self._bodyparts = self.get_bodyparts(self._kin_dfs[0][0])
+            self._kin_dfs[key] = io.load_kinematics_df(key, mouseID, day)
+        
 
         self._kin_mats = []
-        for df1, df2 in self._kin_dfs:
+        for df1, df2 in self.kin_dfs.values():
             self._kin_mats.append( (self.create_kinematics_matrix(df1, self.bodyparts, 0.4), 
                                     self.create_kinematics_matrix(df2, self.bodyparts, 0.4)))
             
-        
 
     # Getter methods for the data to be accessed outside of the class
-    @property
-    def bodyparts(self) -> list[str]:
-        """Get the list of bodyparts tracked in kinematics data"""
-        return self._bodyparts
-
     @property
     def cal_tseries(self) -> np.ndarray:
         """Get the calibration time series data."""
@@ -87,25 +81,15 @@ class MouseDay:
         return self._cal_spks
     
     @property
-    def kin_df1(self) -> list[pd.DataFrame]:
+    def kin_dfs(self) -> list[tuple[pd.DataFrame, pd.DataFrame]]:
         """Get the first kinematic dataframes list. Each df covers 2.5 minutes."""
-        return self._kin_df1
-    
+        return self._kin_dfs       
+
     @property
-    def kin_df2(self) -> list[pd.DataFrame]:
-        """Get the second kinematic dataframes list."""
-        return self._kin_df2
-    
-    @property
-    def kin_mat1(self) -> list[np.ma.MaskedArray]:
+    def kin_mats(self) -> list[tuple[np.ma.MaskedArray, np.ma.MaskedArray]]:
         """Get the first kinematic masked arrays list. Used more frequently for computations."""
-        return self._kin_mat1
-    
-    @property
-    def kin_mat2(self) -> list[np.ma.MaskedArray]:
-        """Get the second kinematic masked arrays list."""
-        return self._kin_mat2
-    
+        return self._kin_mats
+
     @property
     def cal_event_times(self) -> np.ndarray:
         """Get the calibration event times."""
@@ -121,7 +105,7 @@ class MouseDay:
         """Get the event labels."""
         return self._event_labels
 
-
+    # Not in use, changed the list of boydparts to a static variable
     def get_bodyparts(self, df):
         # Extract level 1 (bodyparts) and get unique values
         bodyparts = df.columns.get_level_values('bodyparts').unique().tolist()
@@ -216,7 +200,7 @@ class MouseDay:
             np.NDArray (n_timepoints, 2)
                 Average xy coordinates (tuple) for each timepoint
         """
-        n_parts = len(self._bodyparts)
+        n_parts = len(self.bodyparts)
         
         # Extract X and Y coordinate matrices
         x_coords = kinematics_matrix[:n_parts, :]  # Shape: (n_bodyparts, n_timepoints)
