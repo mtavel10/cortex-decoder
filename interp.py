@@ -74,4 +74,5 @@ days:dict[str,list[str]] = {"mouse25": ["20240425"]}
 # Mouse Test
 
 test_mouse = MouseDay("mouse25", "20240425")
-print(test_mouse.interpolate_kin2cal(0))
+print(test_mouse.kin_dfs)
+test_mouse.interpolate_kin2cal(0)
