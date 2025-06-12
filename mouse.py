@@ -3,7 +3,7 @@ import pandas as pd
 import src.IO as io
 
 # Idea: class hierarchy of mice, then each mouse has a day (yippeee)
-class mouse_day: 
+class MouseDay: 
     """
     Imagine one day you woke up from brain surgery as a mouse. 
     You're hooked up to a dark apparatus and in front of you is a crumb. 
@@ -24,21 +24,21 @@ class mouse_day:
         _cal_tseries : np.ndarray
         _kin_tseries : np.ndarray
 
-        _cal_spks : numpy.ndarray 
-
-        # ask Gabriella how we can change the storage
-        _kin_dfs : tuple[list[pandas.core.frame.DataFrame], list[pandas.core.frame.DataFrame])
-            Each df covers 2.5 minutes
-        _kin_mats : tuple[list[numpy.ma.MaskedArray], list[numpy.ma.MaskedArray]]
-            Matrix versions of the dataframes, better for computations
-        
         _cal_event_times : numpy.ndarray
         _kin_event_times : numpy.ndarray
         _event_labels : numpy.ndarray
 
+        _cal_spks : numpy.ndarray 
+
+        # ask Gabriella how we can change the storage
+        _kin_dfs : list[tuple[pandas.core.frame.DataFrame, pandas.core.frame.DataFrame]]
+            List of 2.5 minute chunks, each chunk has 2 dfs for the 2 camera views
+        _kin_mats : list[tuple[numpy.nparray, numpy.nparray]]
+            Matrix versions of the dataframes, better for computations
+
     """
 
-    def __init__(self, mouseID, day, start_time):
+    def __init__(self, mouseID, day):
         self.mouseID : str = mouseID
         self.day : str = day
 
@@ -46,18 +46,24 @@ class mouse_day:
         self._cal_tseries = io.load_tseries(mouseID, day, "calcium")
         self._kin_tseries = io.load_tseries(mouseID, day, "cam")
 
-        self._cal_spks = io.load_spks(mouseID, day)
-        # This is where we use the start time
-        # How do we determinue the number of events (i.e. number of kinematic data frames per mouse)
-        # PLACEHOLDER: LOAD IN KIN DATA FRAMES AND MATRICES
-        self._
-
-        
-        self._bodyparts = get_bodyparts(kin_df1)
-
         self._cal_event_times = io.load_cal_event_times(mouseID, day)
         self._kin_event_times = io.load_cam_event_times(mouseID, day)
         self._event_labels = io.load_event_labels(mouseID, day)
+
+        self._cal_spks = io.load_spks(mouseID, day)
+
+        self._kin_dfs = []
+        for key in self.kin_event_times:
+            self._kin_dfs.append(io.load_kinematics_df(key, mouseID, day))
+    
+        self._bodyparts = self.get_bodyparts(self._kin_dfs[0][0])
+
+        self._kin_mats = []
+        for df1, df2 in self._kin_dfs:
+            self._kin_mats.append( (self.create_kinematics_matrix(df1, self.bodyparts, 0.4), 
+                                    self.create_kinematics_matrix(df2, self.bodyparts, 0.4)))
+            
+        
 
     # Getter methods for the data to be accessed outside of the class
     @property
@@ -116,13 +122,13 @@ class mouse_day:
         return self._event_labels
 
 
-    def get_bodyparts(df):
+    def get_bodyparts(self, df):
         # Extract level 1 (bodyparts) and get unique values
         bodyparts = df.columns.get_level_values('bodyparts').unique().tolist()
         return sorted(bodyparts)
 
-
-    def get_x_y(df,bp,pcutoff):
+    # Used to load in kinematics matrix from dataframes
+    def get_x_y(self, df, bp, pcutoff):
         """
         Masks x and y values that are lower then a certain liklihood within a given dataframe. 
         Helper function to mask certain values when loading the kinematics matrix. 
@@ -141,10 +147,9 @@ class mouse_day:
         )
         return temp_x, temp_y
 
-
-    def create_kinematics_matrix(df,bodyparts,pcutoff):
+    def create_kinematics_matrix(self, df, bodyparts, pcutoff):
         """
-        This function cstacks the x locations for each bodypart on top of the y locations. 
+        This function stacks the x locations for each bodypart on top of the y locations. 
         Ex: 
                     Frame: 0    1    2    3    4
         Row 0 (wrist_X): [120, 125, 130, 135, 140]
@@ -163,21 +168,21 @@ class mouse_day:
                 Low-confidence points are masked based on pcutoff
         """
         # Get initial for result matrix
-        x_ref, y_ref = get_x_y(df,'wrist',pcutoff)
+        x_ref, y_ref = self.get_x_y(df,'wrist',pcutoff)
         n_timepoints = x_ref.shape[0]
         n_parts = len(bodyparts)
 
         kinematics_all = np.ma.masked_all([2 * n_parts, n_timepoints])
         # Fill in x, y coordinates for each bodypart
         for j, bodypart in enumerate(bodyparts):
-            x, y = get_x_y(df, bodypart, pcutoff)
+            x, y = self.get_x_y(df, bodypart, pcutoff)
             kinematics_all[j,:] = x 
             kinematics_all[n_parts+j,:] = y
         
         return kinematics_all
 
     # Unused atm
-    def get_bodypart_coordinates(kinematics_matrix, bodyparts, part):
+    def get_bodypart_coordinates(self, kinematics_matrix, bodyparts, part):
         """
         Helper function to extract x,y coordinates for a specific bodypart from kinematics matrix.
         
@@ -199,7 +204,7 @@ class mouse_day:
         return x_coords, y_coords
 
     # Helper function for interpolating
-    def get_avg_coordinates(kinematics_matrix) -> np.ndarray:
+    def get_avg_coordinates(self, kinematics_matrix) -> np.ndarray:
         """
         Collapses the locations of each bodypart into an "average" location.
         Idea: weight certain bodyparts over others? 
@@ -227,10 +232,11 @@ class mouse_day:
         return avg_coordinates
 
 
-    # Interpolate method
-    def interpolate_kin2cal(i : int) -> [np.ndarray, np.ndarray]:
+    def interpolate_kin2cal(self, i : int) -> [np.ndarray, np.ndarray]:
         """
-        Interpolates the average location of the mouse's hand during the calcium frame times. 
+        Interpolates the average location of the mouse's hand for calcium frame times. 
+        Limited to the ith 2.5 minute chunk of kinematics data (for now). 
+
         Parameters
             If we can't concatenate all the kinematic matrices during one day, need to specify which 
 
@@ -239,13 +245,13 @@ class mouse_day:
             Average location, interpolated to calcium time series (each timepoint is a calcium camera frame)
         """
         # List of kinematic matrices to process
-        # THIS ONLY WORKS FOR ONE kinematic matrix at a time (why we're grabbing the ith matrix)
+        # THIS ONLY WORKS FOR ONE kinematic chunk at a time (why we're grabbing the ith matrices)
         ith_kin_mats = [self._kin_mats[0][i], self._kin_mats[1][i]]
         cam_avg_interps = []
         
-        for i, kin_mat in enumerate(ith_kin_mats):
+        for i, ith_kin_mat in enumerate(ith_kin_mats):
             # Get the average x and y coordinates across all bodyparts
-            cam_avg_coordinates = get_avg_coordinates(ith_kin_mat)  # maybe later ill modify this function to compute a weighted average
+            cam_avg_coordinates = self.get_avg_coordinates(ith_kin_mat)  # maybe later ill modify this function to compute a weighted average
             cam_x_avg = cam_avg_coordinates[:, 0]
             cam_y_avg = cam_avg_coordinates[:, 1]
             
@@ -262,7 +268,7 @@ class mouse_day:
             cam_x_avg_interp = np.interp(self._cal_tseries, cam_tseries, cam_x_avg)
             cam_y_avg_interp = np.interp(self._cal_tseries, cam_tseries, cam_y_avg)
             
-            # Smush together
+            # Stack x ontop of y
             cam_avg_interp = np.stack((cam_x_avg_interp, cam_y_avg_interp), axis=0)
             cam_avg_interps.append(cam_avg_interp)
         

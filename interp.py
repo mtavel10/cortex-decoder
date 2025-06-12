@@ -2,7 +2,11 @@ import numpy as np
 import pandas as pd
 import src.IO as io
 import src.utils as ut
+from mouse import MouseDay
 
+
+
+# Version 1
 def interpolate_loc_to_cal_frame(mouseID, day):
     """
     Interpolates the average location of the mouse's hand during the calcium frame times. 
@@ -39,6 +43,7 @@ def interpolate_loc_to_cal_frame(mouseID, day):
     camera_frames = len(cam_tseries)
     loc_frames = len(cam1_x_avg)
     min_frames= min(camera_frames, loc_frames)
+
     cam1_x_avg = cam1_x_avg[:min_frames]
     cam1_y_avg = cam1_y_avg[:min_frames]
     cam_tseries = cam_tseries[:min_frames]
@@ -59,8 +64,14 @@ mice:list[str] = ["mouse25"]
 days:dict[str,list[str]] = {"mouse25": ["20240425"]}
 
 
-for mouseID in mice:
-    for day in days[mouseID]:
+# for mouseID in mice:
+#     for day in days[mouseID]:
 
-        interpolated_avg_locs = interpolate_loc_to_cal_frame(mouseID, day)
-        print(interpolated_avg_locs)
+#         interpolated_avg_locs = interpolate_loc_to_cal_frame(mouseID, day)
+#         print(interpolated_avg_locs)
+
+
+# Mouse Test
+
+test_mouse = MouseDay("mouse25", "20240425")
+print(test_mouse.interpolate_kin2cal(0))
