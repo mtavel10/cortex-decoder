@@ -32,8 +32,10 @@ class MouseDay:
         _kin_tseries : np.ndarray
 
         _cal_event_times : numpy.ndarray
+            Indicate the FRAME NUMBER when each event occurred (indexed by event)
         _kin_event_times : numpy.ndarray
         _event_labels : numpy.ndarray
+            Indicate the type of event when each event occurred (indexed by event)
 
         _cal_spks : numpy.ndarray 
 
@@ -208,7 +210,7 @@ class MouseDay:
         return avg_coordinates
 
 
-    def interpolate_kin2cal(self, key) -> [np.ndarray, np.ndarray]:
+    def interpolate_avgkin2cal(self, key) -> [np.ndarray, np.ndarray]:
         """
         Interpolates the average location of the mouse's hand for calcium frame times. 
         Limited to the 2.5 minute chunk of kinematics data specified by the key. 
@@ -221,8 +223,8 @@ class MouseDay:
             2 Numpy NDArrays (2, n_timepoints) (one for each camera)
 
             (calcium frames)   0   1   2   3   4 ...
-                        x      
-                        y
+                    x_avg      
+                    y_avg
 
             Average location, interpolated to calcium time series (each timepoint is a calcium camera frame)
         """
