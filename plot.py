@@ -11,6 +11,7 @@ import sys
 # need to filter the cascade spike data before plotting
 # TEMPORARY
 tseries_max = 4464
+N_PARTS = 14
 
 def plot_mouseday_data(mouse_day, event_key: str, figsize: Tuple[int, int] = (16, 10)):
     """
@@ -147,38 +148,13 @@ def plot_mouseday_data(mouse_day, event_key: str, figsize: Tuple[int, int] = (16
     # ax3.grid(True, alpha=0.3)
     # if plotted_events:
     #     ax3.legend(loc='best', fontsize=8)
-    
-    # Subplot 4: Calcium Spikes Raster Plot
+     
+    # Subplot 4: Calcium Spikes Heat Map
     ax4 = fig.add_subplot(gs[1, :2])
     
-    # Create raster plot of calcium spikes
     n_neurons, n_timepoints = cal_spikes.shape
-    
-    # Plot spikes as scatter plot for better performance
-    spike_times = []
-    spike_neurons = []
 
-    for neuron in range(n_neurons):
-        spike_indices = np.where(cal_spikes[neuron, :] > 0)[0] # indices where this neuron had a spike greater than 0
     
-        if len(spike_indices) > 0:
-            spike_times.extend(cal_tseries[spike_indices])
-            spike_neurons.extend([neuron + 1] * len(spike_indices))
-    
-    if spike_times:
-        ax4.scatter(spike_times, spike_neurons, s=1, c='black', alpha=0.6)
-    
-    # Add event markers
-    for i, (event_time, event_label) in enumerate(zip(cal_event_times, event_labels)):
-        color = event_colors[event_label]
-        ax4.axvline(event_time, color=color, linestyle='--', linewidth=2, alpha=0.8)
-    
-    ax4.set_xlabel('Time (s)')
-    ax4.set_ylabel('Neuron #')
-    ax4.set_title('Calcium Spikes Raster')
-    ax4.set_xlim(start_time, end_time)
-    ax4.set_ylim([1, n_neurons])
-    ax4.grid(True, alpha=0.3)
     
     # # Subplot 5: Average Calcium Activity
     # ax5 = fig.add_subplot(gs[1, 2])
@@ -431,6 +407,123 @@ def plot_correlation_analysis(mouse_day, event_key: str, figsize: Tuple[int, int
     plt.tight_layout()
     return fig
 
+def plot_interp_test(mouse_day, event_key: str, figsize: Tuple[int, int] = (16, 10)):
+    """
+    Creates 8 plots: regular kinematic data by kinematic time frames, and interpolated data by calcium time frames. 
+    Test by visual inspection to make sure they're the same shape. 
+
+            Regular         Interpolated
+
+    Cam1    x1_plot         x1_interp_plot
+            y1_plot         y1_interp_plot
+    Cam2    x2_plot         x2_interp_plot
+            y2_plot         y2_interp_plot
+        
+    """
+    fig, axes = plt.subplots(nrows=4, ncols=2, figsize=figsize)
+    
+    # Regular Data
+    kin_times = mouse_day.kin_tseries
+    max_frames = len(kin_times)
+    curr_kin_mats = mouse_day.kin_mats[event_key]
+    cam1_kin_mat, cam2_kin_mat = curr_kin_mats
+    
+    # Camera 1
+    cam1_avgs = mouse_day.get_avg_coordinates(cam1_kin_mat)[:max_frames]
+    x1 = cam1_avgs[:, 0]
+    axes[0, 0].plot(kin_times, x1)
+    axes[0, 0].set_xlabel('Kinematic Time')
+    axes[0, 0].set_ylabel('X1 Coordinate')
+    axes[0, 0].set_title('Camera 1 - X Coordinate (Regular)')
+    
+    y1 = cam1_avgs[:, 1]
+    axes[1, 0].plot(kin_times, y1)
+    axes[1, 0].set_xlabel('Kinematic Time')
+    axes[1, 0].set_ylabel('Y1 Coordinate')
+    axes[1, 0].set_title('Camera 1 - Y Coordinate (Regular)')
+    
+    # Camera 2
+    cam2_avgs = mouse_day.get_avg_coordinates(cam2_kin_mat)[:max_frames]
+    x2 = cam2_avgs[:, 0]
+    axes[2, 0].plot(kin_times, x2)
+    axes[2, 0].set_xlabel('Kinematic Time')
+    axes[2, 0].set_ylabel('X2 Coordinate')
+    axes[2, 0].set_title('Camera 2 - X Coordinate (Regular)')
+    
+    y2 = cam2_avgs[:, 1]
+    axes[3, 0].plot(kin_times, y2)
+    axes[3, 0].set_xlabel('Kinematic Time')
+    axes[3, 0].set_ylabel('Y2 Coordinate')
+    axes[3, 0].set_title('Camera 2 - Y Coordinate (Regular)')
+    
+    # Interpolated Data
+    cal_times = mouse_day.cal_tseries
+    max_frames = len(cal_times)
+    cam1_interp, cam2_interp = mouse_day.interpolate_avgkin2cal(event_key)
+    cam1_interp = cam1_interp[:, :max_frames]
+    cam2_interp = cam2_interp[:, :max_frames]
+    
+    # Camera 1
+    x1_interp = cam1_interp[0, :]
+    axes[0, 1].plot(cal_times, x1_interp)
+    axes[0, 1].set_xlabel('Calcium Time')
+    axes[0, 1].set_ylabel('X1 Coordinate')
+    axes[0, 1].set_title('Camera 1 - X Coordinate (Interpolated)')
+    
+    y1_interp = cam1_interp[1, :]
+    axes[1, 1].plot(cal_times, y1_interp)
+    axes[1, 1].set_xlabel('Calcium Time')
+    axes[1, 1].set_ylabel('Y1 Coordinate')
+    axes[1, 1].set_title('Camera 1 - Y Coordinate (Interpolated)')
+    
+    # Camera 2
+    x2_interp = cam2_interp[0, :]
+    axes[2, 1].plot(cal_times, x2_interp)
+    axes[2, 1].set_xlabel('Calcium Time')
+    axes[2, 1].set_ylabel('X2 Coordinate')
+    axes[2, 1].set_title('Camera 2 - X Coordinate (Interpolated)')
+    
+    y2_interp = cam2_interp[1, :]
+    axes[3, 1].plot(cal_times, y2_interp)
+    axes[3, 1].set_xlabel('Calcium Time')
+    axes[3, 1].set_ylabel('Y2 Coordinate')
+    axes[3, 1].set_title('Camera 2 - Y Coordinate (Interpolated)')
+
+
+    # Align y-axis limits across regular and interpolated plots for each coordinate
+    # Camera 1 X coordinate (row 0)
+    y_min_x1 = min(axes[0, 0].get_ylim()[0], axes[0, 1].get_ylim()[0])
+    y_max_x1 = max(axes[0, 0].get_ylim()[1], axes[0, 1].get_ylim()[1])
+    axes[0, 0].set_ylim(y_min_x1, y_max_x1)
+    axes[0, 1].set_ylim(y_min_x1, y_max_x1)
+    
+    # Camera 1 Y coordinate (row 1)
+    y_min_y1 = min(axes[1, 0].get_ylim()[0], axes[1, 1].get_ylim()[0])
+    y_max_y1 = max(axes[1, 0].get_ylim()[1], axes[1, 1].get_ylim()[1])
+    axes[1, 0].set_ylim(y_min_y1, y_max_y1)
+    axes[1, 1].set_ylim(y_min_y1, y_max_y1)
+    
+    # Camera 2 X coordinate (row 2)
+    y_min_x2 = min(axes[2, 0].get_ylim()[0], axes[2, 1].get_ylim()[0])
+    y_max_x2 = max(axes[2, 0].get_ylim()[1], axes[2, 1].get_ylim()[1])
+    axes[2, 0].set_ylim(y_min_x2, y_max_x2)
+    axes[2, 1].set_ylim(y_min_x2, y_max_x2)
+    
+    # Camera 2 Y coordinate (row 3)
+    y_min_y2 = min(axes[3, 0].get_ylim()[0], axes[3, 1].get_ylim()[0])
+    y_max_y2 = max(axes[3, 0].get_ylim()[1], axes[3, 1].get_ylim()[1])
+    axes[3, 0].set_ylim(y_min_y2, y_max_y2)
+    axes[3, 1].set_ylim(y_min_y2, y_max_y2)
+    
+    # Add overall title
+    fig.suptitle(f'Kinematic Data Comparison - {event_key}', fontsize=16, y=0.98)
+    
+    # Adjust layout to prevent overlap
+    plt.tight_layout()
+    
+    return fig
+
+
 # Example usage function
 def example_usage():
     """
@@ -444,8 +537,8 @@ def example_usage():
     event_key = event_keys[0]  # Use first available key
     
     # Create comprehensive plot
-    fig1 = plot_mouseday_data(mouse_day, event_key)
-    plt.show()
+    # fig1 = plot_mouseday_data(mouse_day, event_key)
+    # plt.show()
     
     # Create kinematic heatmap
     # fig2 = plot_kinematic_heatmap(mouse_day, event_key)
@@ -453,6 +546,10 @@ def example_usage():
     
     # # Create correlation analysis
     # fig3 = plot_correlation_analysis(mouse_day, event_key)
+    # plt.show()
+
+    # # Test Interpolation function
+    # fig4 = plot_interp_test(mouse_day, event_key)
     # plt.show()
     
     print("Example usage:")

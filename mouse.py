@@ -75,7 +75,7 @@ class MouseDay:
     # Getter methods for the data to be accessed outside of the class
     @property
     def cal_tseries(self) -> np.ndarray:
-        """Get the calibration time series data."""
+        """Get the calcium time series data."""
         return self._cal_tseries
     
     @property
@@ -89,12 +89,12 @@ class MouseDay:
         return self._cal_spks
     
     @property
-    def kin_dfs(self) -> list[tuple[pd.DataFrame, pd.DataFrame]]:
+    def kin_dfs(self) -> dict [str : tuple[pd.DataFrame, pd.DataFrame]]:
         """Get the first kinematic dataframes list. Each df covers 2.5 minutes."""
         return self._kin_dfs       
 
     @property
-    def kin_mats(self) -> list[tuple[np.ma.MaskedArray, np.ma.MaskedArray]]:
+    def kin_mats(self) -> dict [str : tuple[np.ndarray, np.ndarray]]:
         """Get the first kinematic masked arrays list. Used more frequently for computations."""
         return self._kin_mats
 
@@ -194,6 +194,7 @@ class MouseDay:
         Returns:
             np.NDArray (n_timepoints, 2)
                 Average xy coordinates (tuple) for each timepoint
+            maybe i should change to a tuple of n_timepoints??
         """
         
         # Extract X and Y coordinate matrices
@@ -229,13 +230,13 @@ class MouseDay:
             Average location, interpolated to calcium time series (each timepoint is a calcium camera frame)
         """
         # List of kinematic matrices to process
-        # THIS ONLY WORKS FOR ONE kinematic chunk at a time (why we're grabbing the ith matrices)
+        # THIS ONLY WORKS FOR ONE 2.5 min chunk at a time (why we're grabbing the ith matrices)
         curr_kin_mats = self.kin_mats[key]
         cam_avg_interps = []
         
         for i, kin_mat in enumerate(curr_kin_mats):
             # Get the average x and y coordinates across all bodyparts
-            cam_avg_coordinates = self.get_avg_coordinates(kin_mat)  # maybe later ill modify this function to compute a weighted average
+            cam_avg_coordinates = self.get_avg_coordinates(kin_mat)  # maybe later ill modify this function to compute a weighted average ("true centroid")
             cam_x_avg = cam_avg_coordinates[:, 0]
             cam_y_avg = cam_avg_coordinates[:, 1]
             

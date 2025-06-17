@@ -74,21 +74,5 @@ days:dict[str,list[str]] = {"mouse25": ["20240425"]}
 
 test_mouse = MouseDay("mouse25", "20240425")
 interp_test = test_mouse.interpolate_avgkin2cal("133901event001")
-# print(interp_test)
 
-event_labels = test_mouse.event_labels
-print(event_labels)
-print(len(event_labels))
-kin_event_times = test_mouse.kin_event_times
-print(kin_event_times)
-print(len(kin_event_times))
-
-# Check calcium spike data
-print("1. CALCIUM SPIKE DATA:")
-print(f"   Shape: {test_mouse.cal_spks.shape}")
-print(f"   Data type: {test_mouse.cal_spks.dtype}")
-print(f"   Contains NaN: {np.isnan(test_mouse.cal_spks).any()}")
-print(f"   All NaN: {np.isnan(test_mouse.cal_spks).all()}")
-print(f"   Min value: {np.nanmin(test_mouse.cal_spks)}")
-print(f"   Max value: {np.nanmax(test_mouse.cal_spks)}")
-print(f"   Number of non-NaN values: {np.sum(~np.isnan(test_mouse.cal_spks))}")
+print(test_mouse.cal_spks[32:-32, 32:-32])
