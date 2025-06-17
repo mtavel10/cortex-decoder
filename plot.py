@@ -42,6 +42,7 @@ def plot_mouseday_data(mouse_day, event_key: str, figsize: Tuple[int, int] = (16
     # Get event data
     cal_event_times = mouse_day.cal_event_times
     event_labels = mouse_day.event_labels
+    
     # Another temporary limit
     temp_mask = cal_event_times <= max_frames
     cal_event_times = cal_event_times[temp_mask]
@@ -60,7 +61,7 @@ def plot_mouseday_data(mouse_day, event_key: str, figsize: Tuple[int, int] = (16
     
     # Create figure with subplots
     fig = plt.figure(figsize=figsize)
-    gs = fig.add_gridspec(3, 3, hspace=0.3, wspace=0.3)
+    gs = fig.add_gridspec(3, 2, hspace=0.3, wspace=0.3)
     
     # Subplot 1: Camera 1 - X and Y positions over time
     ax1 = fig.add_subplot(gs[0, 0])
@@ -74,12 +75,12 @@ def plot_mouseday_data(mouse_day, event_key: str, figsize: Tuple[int, int] = (16
         frame_idx = int(frame)
         
         # Plot vertical lines for events
-        ax1.axvline(cal_tseries[frame_idx], color=color, linestyle='--', linewidth=2, alpha=0.7)
+        # ax1.axvline(cal_tseries[frame_idx], color=color, linestyle='--', linewidth=2, alpha=0.7)
         
         # Add markers at kinematic positions
-        ax1.plot(cal_tseries[frame_idx], cam1_avg[0, frame_idx], 'o', color=color, markersize=8, 
+        ax1.plot(cal_tseries[frame_idx], cam1_avg[0, frame_idx], 'o', color=color, markersize=5, 
                 markerfacecolor=color, markeredgecolor='white', markeredgewidth=1)
-        ax1.plot(cal_tseries[frame_idx], cam1_avg[1, frame_idx], 's', color=color, markersize=8, 
+        ax1.plot(cal_tseries[frame_idx], cam1_avg[1, frame_idx], 's', color=color, markersize=5, 
                 markerfacecolor=color, markeredgecolor='white', markeredgewidth=1)
 
     ax1.set_xlim(start_time, end_time)
@@ -100,12 +101,12 @@ def plot_mouseday_data(mouse_day, event_key: str, figsize: Tuple[int, int] = (16
         frame_idx = int(frame)
         
         # Plot vertical lines for events
-        ax2.axvline(cal_tseries[frame_idx], color=color, linestyle='--', linewidth=2, alpha=0.7)
+        # ax2.axvline(cal_tseries[frame_idx], color=color, linestyle='--', linewidth=2, alpha=0.7)
         
         # Add markers at kinematic positions
-        ax2.plot(cal_tseries[frame_idx], cam2_avg[0, frame_idx], 'o', color=color, markersize=8, 
+        ax2.plot(cal_tseries[frame_idx], cam2_avg[0, frame_idx], 'o', color=color, markersize=5, 
                 markerfacecolor=color, markeredgecolor='white', markeredgewidth=1)
-        ax2.plot(cal_tseries[frame_idx], cam2_avg[1, frame_idx], 's', color=color, markersize=8, 
+        ax2.plot(cal_tseries[frame_idx], cam2_avg[1, frame_idx], 's', color=color, markersize=5, 
                 markerfacecolor=color, markeredgecolor='white', markeredgewidth=1)
     
     ax2.set_xlim(start_time, end_time)
