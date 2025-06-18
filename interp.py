@@ -74,5 +74,10 @@ days:dict[str,list[str]] = {"mouse25": ["20240425"]}
 
 test_mouse = MouseDay("mouse25", "20240425")
 interp_test = test_mouse.interpolate_avgkin2cal("133901event001")
+# print(test_mouse.cal_tseries)
 
-print(test_mouse.cal_spks[32:-32, 32:-32])
+# print(test_mouse.cal_spks[32:-32, 32:-32])
+
+test_cal_tstamps = io.load_timestamps("mouse25", "20240425", "calcium")
+# print(test_cal_tstamps)
+test_cam_tstamps = io.load_timestamps("mouse25", "20240425", "camera")

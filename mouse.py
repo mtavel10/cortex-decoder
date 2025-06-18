@@ -28,16 +28,19 @@ class MouseDay:
         day : str
             YYYYMMDD
 
-        _cal_tseries : np.ndarray
-        _kin_tseries : np.ndarray
+        _cal_tstamps : np.ndarray[datetime64[ns]]
+            Time (ns) since Unix Epoch per calcium camera frame
+        _kin_tstamps : dict { "timeeventkey", np.ndarray[datetime64[ns]]}
+            For each 2.5 minute chunk, time (ns) since Unix Epoch per kinematic camera frame
 
         _cal_event_times : numpy.ndarray
-            Indicate the FRAME NUMBER when each event occurred (indexed by event)
+            Indicates the FRAME NUMBER when each event occurred (indexed by event)
         _kin_event_times : numpy.ndarray
         _event_labels : numpy.ndarray
             Indicate the type of event when each event occurred (indexed by event)
 
         _cal_spks : numpy.ndarray 
+            Spike probabilities for each neuron at each timepoint
 
         _kin_dfs : dict { "timeeventkey , tuple[pandas.DataFrame, pandas.DataFrame]}
             List of 2.5 minute chunks, each chunk has 2 dfs for the 2 camera views
@@ -113,6 +116,20 @@ class MouseDay:
         """Get the event labels."""
         return self._event_labels
 
+    # The list of event keys for this day
+    def event_keys(self) -> list[str]:
+        return kin_event_times.keys()
+
+    # Camera frames differ from timestamp frames
+    def cal_nframes(self) -> int:
+        return len(cal_spks[0])
+    
+    def cal_ntimeframes(self) -> int:
+        return len(cal_tseries)
+    
+    def kin_nframes(self) -> int:
+        return len(kin_mats)
+
     # Not in use, changed the list of boydparts to a static variable
     def get_bodyparts(self, df):
         # Extract level 1 (bodyparts) and get unique values
@@ -183,6 +200,7 @@ class MouseDay:
         return kinematics_matrix[self.N_PARTS:, :]
 
     # Helper function for interpolating
+
     def get_avg_coordinates(self, kinematics_matrix) -> np.ndarray:
         """
         Collapses the locations of each bodypart into an "average" location.
@@ -209,7 +227,6 @@ class MouseDay:
         avg_coordinates = np.column_stack((x_avg, y_avg))
         
         return avg_coordinates
-
 
     def interpolate_avgkin2cal(self, key) -> [np.ndarray, np.ndarray]:
         """
@@ -241,23 +258,20 @@ class MouseDay:
             cam_y_avg = cam_avg_coordinates[:, 1]
             
             # Resizing the kinematics-camera frames to match the kinematics time series
-            cam_frames = len(self._kin_tseries)
+            cam_frames = len(self.kin_tseries)
             kin_frames = len(cam_x_avg)
             min_frames = min(cam_frames, kin_frames)
             
             cam_x_avg = cam_x_avg[:min_frames]
             cam_y_avg = cam_y_avg[:min_frames]
-            cam_tseries = self._kin_tseries[:min_frames]
+            cam_tseries = self.kin_tseries[:min_frames]
             
             # Interpolate!
-            cam_x_avg_interp = np.interp(self._cal_tseries, cam_tseries, cam_x_avg)
-            cam_y_avg_interp = np.interp(self._cal_tseries, cam_tseries, cam_y_avg)
+            cam_x_avg_interp = np.interp(self.cal_tseries, cam_tseries, cam_x_avg)
+            cam_y_avg_interp = np.interp(self.cal_tseries, cam_tseries, cam_y_avg)
             
             # Stack x ontop of y
             cam_avg_interp = np.stack((cam_x_avg_interp, cam_y_avg_interp), axis=0)
             cam_avg_interps.append(cam_avg_interp)
         
         return cam_avg_interps[0], cam_avg_interps[1]
-    
-    def interpolate_event_labels(self) -> np.ndarray:
-        return self.event_labels
