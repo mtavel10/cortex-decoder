@@ -124,4 +124,20 @@ def load_tseries(mouseID, day, type):
     """
     s2p_fld = get_s2p_fld(mouseID, day)
     tseries = np.load(f"{s2p_fld}/tseries/TSeries-04252024-0944-1316_{type}_frame_timestamps.npy")
-    return tseries.astype('datetime64[s]').astype(float)
+    return tseries.astype('datetime64[ns]').astype(float)
+
+# ALL timestamps for the day
+def load_timestamps(mouseID, day, type):
+    """
+    Returns
+        numpy np.array
+            Seconds since Unix Epoch (float) per camera frame (for either calcium camera or kinematics camera, as specified by type param)
+    """
+    s2p_fld = get_s2p_fld(mouseID, day)
+    if type == "calcium":
+        cal_tstamps = np.load(f"{s2p_fld}/tseries/calcium_timestamps.npy")
+        return cal_tstamps.astype('datetime64[ns]').astype(float)
+    else:
+        cam_tstamps = load_pickle(f"{s2p_fld}/tseries/cam_timestamps.pkl")
+        print(cam_tstamps["133901event001"].astype('datetime64[ns]').astype(float))
+        return cam_tstamps # ask Gabriella for dictionary version of this
