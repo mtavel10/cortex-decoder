@@ -124,20 +124,35 @@ def load_tseries(mouseID, day, type):
     """
     s2p_fld = get_s2p_fld(mouseID, day)
     tseries = np.load(f"{s2p_fld}/tseries/TSeries-04252024-0944-1316_{type}_frame_timestamps.npy")
-    return tseries.astype('datetime64[ns]').astype(float)
+    tseries_converted = tseries.astype('datetime64[ns]').astype(float)
+    # print(type, ": ", tseries_converted)
+    return tseries_converted
 
 # ALL timestamps for the day
-def load_timestamps(mouseID, day, type):
+def load_tstamp_dict(mouseID, day, type):
     """
+    Parameters
+        mouseID
+        day
+        type
+            either 'calcium' or 'cam'
     Returns
-        numpy np.array
-            Seconds since Unix Epoch (float) per camera frame (for either calcium camera or kinematics camera, as specified by type param)
+        dict {"segkey": numpy.ndarray}
+        Seconds since Unix Epoch (float) per camera frame (for either calcium camera or kinematics camera, as specified by type param)
     """
     s2p_fld = get_s2p_fld(mouseID, day)
-    if type == "calcium":
-        cal_tstamps = np.load(f"{s2p_fld}/tseries/calcium_timestamps.npy")
-        return cal_tstamps.astype('datetime64[ns]').astype(float)
-    else:
-        cam_tstamps = load_pickle(f"{s2p_fld}/tseries/cam_timestamps.pkl")
-        print(cam_tstamps["133901event001"].astype('datetime64[ns]').astype(float))
-        return cam_tstamps # ask Gabriella for dictionary version of this
+    tstamps = load_pickle(f"{s2p_fld}/tseries/{type}_timestamps.pkl")
+    for event in tstamps:
+        tstamps[event] = tstamps[event].to_numpy(dtype=float)
+    # print(type, " Tstamp:", tstamps['133901event001'])
+    return tstamps
+
+def load_cal_tstamps(mouseID, day):
+    """
+    Returns
+        numpy.ndarray
+            Seconds since Unix Epoch (float) per calcium camera frame
+    """
+    s2p_fld = get_s2p_fld(mouseID, day)
+    cal_tstamps = np.load(f"{s2p_fld}/tseries/calcium_timestamps.npy")
+    return cal_tstamps.astype('datetime64[ns]').astype(float)
