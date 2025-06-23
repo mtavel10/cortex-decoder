@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import src.IO as io
+import json
 
 # Idea: class hierarchy of mice, then each mouse has a day (yippeee)
 class MouseDay: 
@@ -90,6 +91,8 @@ class MouseDay:
         for key in self.seg_keys:
             df1, df2 = self._kin_dfs[key]  # Assuming load_kinematics_df returns a tuple of two dataframes
             self._kin_mats[key] = (self.create_kinematics_matrix(df1), self.create_kinematics_matrix(df2))
+        
+        self._interpolated_kin_avgs = self.interpolate_all("avg")
 
     # Getter methods for the data to be accessed outside of the class
     @property
@@ -293,8 +296,7 @@ class MouseDay:
         curr_cal_tstamps = self.cal_tstamp_dict[key]
         # print(curr_cal_tstamps)
         avg_interps = []
-        print("for new func...")
-        
+    
         for cam in curr_kin_mats:
             # Get the average x and y coordinates across all bodyparts
             avg_coordinates = self.get_avg_coordinates(cam) # maybe later ill modify this function to compute a weighted average ("true centroid")
@@ -307,10 +309,6 @@ class MouseDay:
             x_avg = x_avg[:max_frames]
             y_avg = y_avg[:max_frames]
             cam_tstamps = curr_kin_tstamps[:max_frames]
-            print("variables...")
-            print(curr_cal_tstamps)
-            print(cam_tstamps)
-            print(x_avg)
             # Interpolate!
             x_avg_interp = np.interp(curr_cal_tstamps, cam_tstamps, x_avg)
             y_avg_interp = np.interp(curr_cal_tstamps, cam_tstamps, y_avg)
@@ -321,61 +319,46 @@ class MouseDay:
         
         return tuple(avg_interps)
     
-    def OLDinterpolate_avgkin2cal(self, key) -> [np.ndarray, np.ndarray]:
-        """
-        Interpolates the average location of the mouse's hand for calcium frame times. 
-        Limited to the 2.5 minute chunk of kinematics data specified by the key. 
-        For later: Maybe save this as new "interpolated" kinematics matrices to simplify decoder (can just perform operations on the interpolated data)
-
-        Parameters
-            If we can't concatenate all the kinematic matrices during one day, need to specify which 
-
-        Returns 
-            2 Numpy NDArrays (2, n_timepoints) (one for each camera)
-
-            (calcium frames)   0   1   2   3   4 ...
-                    x_avg      
-                    y_avg
-
-            Average location, interpolated to calcium time series (each timepoint is a calcium camera frame)
-        """
-        # List of kinematic matrices to process
-        # THIS ONLY WORKS FOR ONE 2.5 min chunk at a time (why we're grabbing the ith matrices)
-        curr_kin_mats = self.kin_mats[key]
-        cam_avg_interps = []
-        
-        for i, kin_mat in enumerate(curr_kin_mats):
-            # Get the average x and y coordinates across all bodyparts
-            cam_avg_coordinates = self.get_avg_coordinates(kin_mat)  # maybe later ill modify this function to compute a weighted average ("true centroid")
-            cam_x_avg = cam_avg_coordinates[:, 0]
-            cam_y_avg = cam_avg_coordinates[:, 1]
-            # print(cam_avg_coordinates)
-            
-            # Resizing the kinematics-camera frames to match the kinematics time series
-            cam_frames = len(self.kin_tseries)
-            kin_frames = len(cam_x_avg)
-            min_frames = min(cam_frames, kin_frames)
-            
-            cam_x_avg = cam_x_avg[:min_frames]
-            cam_y_avg = cam_y_avg[:min_frames]
-            cam_tseries = self.kin_tseries[:min_frames]
-            print("variables...")
-            print(self.cal_tseries)
-            print(cam_tseries)
-            print(cam_x_avg)
-            
-            # Interpolate!
-            cam_x_avg_interp = np.interp(self.cal_tseries, cam_tseries, cam_x_avg)
-            cam_y_avg_interp = np.interp(self.cal_tseries, cam_tseries, cam_y_avg)
-            
-            # Stack x ontop of y
-            cam_avg_interp = np.stack((cam_x_avg_interp, cam_y_avg_interp), axis=0)
-            cam_avg_interps.append(cam_avg_interp)
-        
-        return cam_avg_interps[0], cam_avg_interps[1]
     
-    def interpolate_all_avgkin2cal(self):
+    def interpolate_all(self, features : str) -> {str : tuple[np.ndarray, np.ndarray]}:
         kin_avg_interp = {}
-        for key in self.seg_keys:
-            kin_avg_interp[key] = interpolate_avgkin2cal(key)
+        for seg in self.seg_keys:
+            if features == "avg":
+                kin_avg_interp[seg] = self.interpolate_avgkin2cal(seg)
+        
+        # print(kin_avg_interp)
+        # np.save("{mouseID}/interpolated_avgs.npy", kin_avg_interp)
         return kin_avg_interp
+    
+    def get_all_avg_locations(self):
+        """
+        Stiches together all average kinematic positions from each recording segment. 
+        Returns
+            all_avg_locations (n_timepoints, 4) : ndarray
+                x1 y1 x2 y2
+                one coordinate pair per camera view
+
+        """
+        all_cam1 = []
+        all_cam2 = []
+        for seg, cam_locs in self._interpolated_kin_avgs.items():
+            cam1_locs, cam2_locs = cam_locs
+            all_cam1.append(cam1_locs.T)
+            all_cam2.append(cam2_locs.T)
+
+         # Concatenate all segments (row-wise) so they're stacked ontop of each other
+        all_cam1 = np.concatenate(all_cam1, axis=0)
+        all_cam2 = np.concatenate(all_cam2, axis=0)
+
+        all_avg_locations = np.hstack([all_cam1, all_cam2])
+        return all_avg_locations
+
+    def get_trimmed_spks(self):
+        return self.cal_spks[32:-32, 32:-32]
+
+    def get_trimmed_avg_locs(self):
+        # First and last 32 frames are NaN because of spike probability estimate algorithm
+        trimmed1 = self.get_all_avg_locations()[32:-32]
+        # More calcium timestamps then camera frames
+        trimmed2 = trimmed1[:(self.cal_nframes-64)]
+        return trimmed2

@@ -254,9 +254,9 @@ def plot_interp_test(mouse_day, event_key: str, figsize: Tuple[int, int] = (16, 
     
     return fig
 
+
 def plot_tseries_tstamps(mouse_day, event_key: str, figsize: Tuple[int, int] = (16, 10)):
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=figsize)
-    print(mouse_day.cal_tseries)
     axes[0, 0].plot(mouse_day.cal_tseries)
     axes[0, 1].plot(mouse_day.kin_tseries)
     axes[1, 0].plot(mouse_day.cal_tstamp_dict[event_key])
@@ -273,8 +273,9 @@ if __name__ == "__main__":
     # plt.show()
 
     # Test Interpolation function
-    fig4 = plot_interp_test(mouse_day, event_key)
-    plt.show()
+    # for key in event_keys:
+    #     fig4 = plot_interp_test(mouse_day, key)
+    #     plt.show()
 
     # # Test Tstamps
     # fig3 = plot_tseries_tstamps(mouse_day, event_key)

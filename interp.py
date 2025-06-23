@@ -20,29 +20,21 @@ days:dict[str,list[str]] = {"mouse25": ["20240425"]}
 # Mouse Test
 
 test_mouse = MouseDay("mouse25", "20240425")
-print("old interpolation...")
-print(test_mouse.OLDinterpolate_avgkin2cal(test_mouse.seg_keys[0]))
-print("new interpolation...")
-print(test_mouse.interpolate_avgkin2cal(test_mouse.seg_keys[0]))
-# cal_tstamp_dict = test_mouse.cal_tstamp_dict
-# # print(cal_tstamp_dict)
-# cal_tseries = test_mouse.cal_tseries
-# print(cal_tseries)
-# kin_tstamp_dict = test_mouse.kin_tstamp_dict
-# print(kin_tstamp_dict)
-# interp_test = test_mouse.interpolate_avgkin2cal("133901event001")
-# print(interp_test)
-# print(test_mouse.cal_tstamp_dict)
-# print(test_mouse.kin_tstamp_dict)
-# print(test_mouse.seg_keys)
-# print("Calcium (camera) frames: ", test_mouse.cal_nframes)
-# print("Calcium (timestamp) frames: ", test_mouse.cal_ntimeframes)
-# print("Kinematics (camera) frames: ", test_mouse.kin_nframes)
-# print("Kinematics (timestamp) frames: ", test_mouse.kin_ntimeframes)
+X = test_mouse.get_trimmed_spks()
+y = test_mouse.get_trimmed_avg_locs()
 
-# print(test_mouse.cal_spks[32:-32, 32:-32])
+print(X.shape)
+print(y.shape)
 
-# test_cal_tstamps = test_mouse.cal_tstamps
-# # print(test_cal_tstamps)
-# test_kin_tstamps = test_mouse.kin_tstamps
-# # print(test_cam_tstamps)
+# Ridge Regression
+# lam = 0.4
+
+# X2 = X.T @ X
+# w = np.linalg.inv(X2 + lam * np.eye(X2.shape[0])) @ X.T @ y
+
+# Least Squares Regression
+w = np.linalg.inv(X.T @ X) @ X.T @ y
+
+
+# interpolated_data = np.load("test_interps.npy", allow_pickle=True)
+# print(interpolated_data)
