@@ -4,59 +4,6 @@ import src.IO as io
 import src.utils as ut
 from mouse import MouseDay
 
-
-# Version 1
-def interpolate_loc_to_cal_frame(mouseID, day):
-    """
-    Interpolates the average location of the mouse's hand during the calcium frame times. 
-
-    Parameters
-        MouseID and Day
-    Returns
-        Numpy NDArray (2, n_timepoints)
-        Average location, interpolated to calcium time series (each timepoint is a calcium camera frame)
-    """
-
-    # calcium time per frame
-    cal_tseries = io.load_tseries(mouseID, day, "calcium")
-    print(type(cal_tseries))
-
-    # kinematic time per frame
-    cam_tseries = io.load_tseries(mouseID, day, "cam")
-    print(type(cam_tseries))
-
-    # kinematic location per frame
-    camdf1, camdf2 = io.load_kinematics_df("133901event001", "mouse25", "20240425")
-    print(type(camdf1))
-
-    # Camera 1
-    bodyparts = io.get_bodyparts(camdf1)
-    cam1_matrix = io.load_kinematics_matrix(camdf1, bodyparts, 0.4)
-
-    # Get the average x and y coordinates across all bodyparts
-    cam1_avg_coordinates = io.get_avg_coordinates(cam1_matrix, bodyparts) # maybe later ill modify this function to compute a weighted average
-    cam1_x_avg = cam1_avg_coordinates[:, 0]
-    cam1_y_avg = cam1_avg_coordinates[:, 1]
-
-    # Resizing the camera frames to match the camera time series
-    camera_frames = len(cam_tseries)
-    loc_frames = len(cam1_x_avg)
-    min_frames= min(camera_frames, loc_frames)
-
-    cam1_x_avg = cam1_x_avg[:min_frames]
-    cam1_y_avg = cam1_y_avg[:min_frames]
-    cam_tseries = cam_tseries[:min_frames]
-
-    # Interpolate! 
-    cam1_x_avg_interp = np.interp(cal_tseries, cam_tseries, cam1_x_avg)
-    cam1_y_avg_interp = np.interp(cal_tseries, cam_tseries, cam1_y_avg)
-
-    # Smush together
-    cam1_avg_interp = np.stack((cam1_x_avg_interp, cam1_y_avg_interp), axis=0)
-
-    print(cam1_avg_interp)
-
-
 # Tracks mouse data and dates imported onto this file system (in prog)
 # Figure out a way to not have to do this manually (read off directory??)
 mice:list[str] = ["mouse25"]
@@ -73,11 +20,29 @@ days:dict[str,list[str]] = {"mouse25": ["20240425"]}
 # Mouse Test
 
 test_mouse = MouseDay("mouse25", "20240425")
-interp_test = test_mouse.interpolate_avgkin2cal("133901event001")
-# print(test_mouse.cal_tseries)
+print("old interpolation...")
+print(test_mouse.OLDinterpolate_avgkin2cal(test_mouse.seg_keys[0]))
+print("new interpolation...")
+print(test_mouse.interpolate_avgkin2cal(test_mouse.seg_keys[0]))
+# cal_tstamp_dict = test_mouse.cal_tstamp_dict
+# # print(cal_tstamp_dict)
+# cal_tseries = test_mouse.cal_tseries
+# print(cal_tseries)
+# kin_tstamp_dict = test_mouse.kin_tstamp_dict
+# print(kin_tstamp_dict)
+# interp_test = test_mouse.interpolate_avgkin2cal("133901event001")
+# print(interp_test)
+# print(test_mouse.cal_tstamp_dict)
+# print(test_mouse.kin_tstamp_dict)
+# print(test_mouse.seg_keys)
+# print("Calcium (camera) frames: ", test_mouse.cal_nframes)
+# print("Calcium (timestamp) frames: ", test_mouse.cal_ntimeframes)
+# print("Kinematics (camera) frames: ", test_mouse.kin_nframes)
+# print("Kinematics (timestamp) frames: ", test_mouse.kin_ntimeframes)
 
 # print(test_mouse.cal_spks[32:-32, 32:-32])
 
-test_cal_tstamps = io.load_timestamps("mouse25", "20240425", "calcium")
-# print(test_cal_tstamps)
-test_cam_tstamps = io.load_timestamps("mouse25", "20240425", "camera")
+# test_cal_tstamps = test_mouse.cal_tstamps
+# # print(test_cal_tstamps)
+# test_kin_tstamps = test_mouse.kin_tstamps
+# # print(test_cam_tstamps)

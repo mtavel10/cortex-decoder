@@ -13,39 +13,49 @@ class MouseDay:
     Another tracks calcium spikes through photons in your brain. 
     Here is the data from that day. 
 
-        BODYPARTS : list[str]
-            list of the bodyparts recorded by the kinematic cameras
-            static
+        class vars
+            BODYPARTS : list[str]
+                list of the bodyparts recorded by the kinematic cameras
+                static
 
-        N_PARTS : int
-            number of bodyparts
-        
-        CUTOFF : int
-            minimum confidence to keep kinematic data
+            N_PARTS : int
+                number of bodyparts
+            
+            CUTOFF : int
+                minimum confidence to keep kinematic data
 
-        mouseID : str
-            ex- "mouse25"
-        day : str
-            YYYYMMDD
+        protected vars
+            _mouseID : str
+                    ex- "mouse25"
+            _day : str
+                YYYYMMDD
 
-        _cal_tstamps : np.ndarray[datetime64[ns]]
-            Time (ns) since Unix Epoch per calcium camera frame
-        _kin_tstamps : dict { "timeeventkey", np.ndarray[datetime64[ns]]}
-            For each 2.5 minute chunk, time (ns) since Unix Epoch per kinematic camera frame
+            _seg_keys : list[str]
+                A list of keys for 2.5 min segments of data collected during this day
+                Each key is formatted by time and event e.g. "133901event001"
 
-        _cal_event_times : numpy.ndarray
-            Indicates the FRAME NUMBER when each event occurred (indexed by event)
-        _kin_event_times : numpy.ndarray
-        _event_labels : numpy.ndarray
-            Indicate the type of event when each event occurred (indexed by event)
+            _cal_tstamps : np.ndarray[float]
+                Time (ns) since Unix Epoch per calcium camera frame
+            _cal_tstamp_dict : dict { "segkey", np.ndarray[int]}
+                For each 2.5 minute chunk, time (ns) since Unix Epoch per calcium camera frame
+            _kin_tstamp_dict : dict { "segkey", np.ndarray[int]}
+                For each 2.5 minute chunk, time (ns) since Unix Epoch per kinematic camera frame
 
-        _cal_spks : numpy.ndarray 
-            Spike probabilities for each neuron at each timepoint
+            _cal_spks : numpy.ndarray 
+                Spike probabilities for each neuron at each timepoint
 
-        _kin_dfs : dict { "timeeventkey , tuple[pandas.DataFrame, pandas.DataFrame]}
-            List of 2.5 minute chunks, each chunk has 2 dfs for the 2 camera views
-        _kin_mats : dict { "timeventkey", tuple[numpy.ndarray, numpy.ndarray]}
-            Matrix versions of the dataframes, better for computations
+            _kin_dfs : dict { "segkey , tuple[pandas.DataFrame, pandas.DataFrame]}
+                List of 2.5 minute chunks, each chunk has 2 dfs for the 2 camera views
+            _kin_mats : dict { "segkey", tuple[numpy.ndarray, numpy.ndarray]}
+                Matrix versions of the dataframes, better for computations
+            
+            _cal_event_frames : numpy.ndarray
+                Indicates the CALCIUM CAMERA FRAME when each event occurred (indexed by event)
+            
+            _kin_event_frames : dict { "segkey", np.ndarray }
+                For each 2.5 minute chunk, indicates the KINEMATIC CAMERA FRAME when each event occurred
+            _event_labels : numpy.ndarray
+                Indicate the type of event when each event occurred (indexed by event)
 
     """
     BODYPARTS = ['d1middle', 'd2tip', 'd2middle', 'd2knuckle', 'd3tip', 'd3middle',	'd3knuckle', 'd4tip', 'd4middle', 'wrist', 'wrist_outer', 'elbow', 'elbow_crook', 'pellet', 'pedestal', 'p2d1tip']
@@ -57,21 +67,27 @@ class MouseDay:
         self.day : str = day
 
         # Load all the data
+        # # Keeping these for debugging purposes as I scale up to all time series
         self._cal_tseries = io.load_tseries(mouseID, day, "calcium")
         self._kin_tseries = io.load_tseries(mouseID, day, "cam")
 
-        self._cal_event_times = io.load_cal_event_times(mouseID, day)
-        self._kin_event_times = io.load_cam_event_times(mouseID, day)
+        self._cal_tstamp_dict = io.load_tstamp_dict(mouseID, day, "calcium")
+        self._kin_tstamp_dict = io.load_tstamp_dict(mouseID, day, "cam")
+
+
+        self._cal_tstamps = io.load_cal_tstamps(mouseID, day)
+        self._cal_event_frames = io.load_cal_event_times(mouseID, day)
+        self._kin_event_frames = io.load_cam_event_times(mouseID, day)
         self._event_labels = io.load_event_labels(mouseID, day)
 
         self._cal_spks = io.load_spks(mouseID, day)
 
         self._kin_dfs = {}
-        for key in self.kin_event_times:
+        for key in self.seg_keys:
             self._kin_dfs[key] = io.load_kinematics_df(key, mouseID, day)
 
         self._kin_mats = {}
-        for key in self.kin_event_times:
+        for key in self.seg_keys:
             df1, df2 = self._kin_dfs[key]  # Assuming load_kinematics_df returns a tuple of two dataframes
             self._kin_mats[key] = (self.create_kinematics_matrix(df1), self.create_kinematics_matrix(df2))
 
@@ -85,6 +101,21 @@ class MouseDay:
     def kin_tseries(self) -> np.ndarray:
         """Get the kinematic time series data."""
         return self._kin_tseries
+
+    @property
+    def cal_tstamps(self) -> np.ndarray:
+        """Get the calcium time series data."""
+        return self._cal_tstamps
+    
+    @property
+    def cal_tstamp_dict(self) -> dict [str : np.ndarray]:
+        """Get the calcium time series data."""
+        return self._cal_tstamp_dict
+
+    @property
+    def kin_tstamp_dict(self) -> dict [str : np.ndarray]:
+        """Get the kinematic time series data."""
+        return self._kin_tstamp_dict
     
     @property
     def cal_spks(self) -> np.ndarray:
@@ -102,14 +133,14 @@ class MouseDay:
         return self._kin_mats
 
     @property
-    def cal_event_times(self) -> np.ndarray:
+    def cal_event_frames(self) -> np.ndarray:
         """Get the calibration event times."""
-        return self._cal_event_times
+        return self._cal_event_frames
     
     @property
-    def kin_event_times(self) -> np.ndarray:
+    def kin_event_frames(self) -> np.ndarray:
         """Get the kinematic event times."""
-        return self._kin_event_times
+        return self._kin_event_frames
     
     @property
     def event_labels(self) -> np.ndarray:
@@ -117,18 +148,26 @@ class MouseDay:
         return self._event_labels
 
     # The list of event keys for this day
-    def event_keys(self) -> list[str]:
-        return kin_event_times.keys()
+    @property
+    def seg_keys(self) -> list[str]:
+        return list(self.kin_event_frames.keys())
 
-    # Camera frames differ from timestamp frames
+    # Calcium camera frames differ from timestamp frames
+    @property
     def cal_nframes(self) -> int:
-        return len(cal_spks[0])
+        return len(self.cal_spks[0])
     
+    @property
     def cal_ntimeframes(self) -> int:
-        return len(cal_tseries)
+        return len(self.cal_tstamps)
     
-    def kin_nframes(self) -> int:
-        return len(kin_mats)
+    # Number of frames varies per recording segment... should these even be properties?
+    # Assumes the frames are uniform across cameras
+    def get_kin_nframes(self, key) -> int:
+        return len(self.kin_mats[key][0][0])
+    
+    def get_kin_ntimeframes(self, key) -> int:
+        return len(self.kin_tstamp_dict[key])
 
     # Not in use, changed the list of boydparts to a static variable
     def get_bodyparts(self, df):
@@ -228,7 +267,61 @@ class MouseDay:
         
         return avg_coordinates
 
-    def interpolate_avgkin2cal(self, key) -> [np.ndarray, np.ndarray]:
+    def interpolate_avgkin2cal(self, key) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Interpolates the average location of the mouse's hand for calcium frame times. 
+        Limited to the 2.5 minute chunk of kinematics data specified by the key. 
+        For later: Maybe save this as new "interpolated" kinematics matrices to simplify decoder (can just perform operations on the interpolated data)
+
+        Parameters
+            If we can't concatenate all the kinematic matrices during one day, need to specify which 
+
+        Returns 
+            2 Numpy NDArrays (2, n_timepoints) (one for each camera)
+
+            (calcium frames)   0   1   2   3   4 ...
+                    x_avg      
+                    y_avg
+
+            Average location, interpolated to calcium time series (each timepoint is a calcium camera frame)
+        """
+        # List of kinematic matrices to process
+        # THIS ONLY WORKS FOR ONE 2.5 min chunk at a time
+        curr_kin_mats = self.kin_mats[key]
+        curr_kin_tstamps = self.kin_tstamp_dict[key]
+        # print(curr_kin_tstamps)
+        curr_cal_tstamps = self.cal_tstamp_dict[key]
+        # print(curr_cal_tstamps)
+        avg_interps = []
+        print("for new func...")
+        
+        for cam in curr_kin_mats:
+            # Get the average x and y coordinates across all bodyparts
+            avg_coordinates = self.get_avg_coordinates(cam) # maybe later ill modify this function to compute a weighted average ("true centroid")
+            # print(avg_coordinates)
+            x_avg = avg_coordinates[:, 0]
+            y_avg = avg_coordinates[:, 1]
+            
+            # Resizing the kinematics-camera frames to match the kinematics time series
+            max_frames = min(self.get_kin_ntimeframes(key), self.get_kin_nframes(key))
+            x_avg = x_avg[:max_frames]
+            y_avg = y_avg[:max_frames]
+            cam_tstamps = curr_kin_tstamps[:max_frames]
+            print("variables...")
+            print(curr_cal_tstamps)
+            print(cam_tstamps)
+            print(x_avg)
+            # Interpolate!
+            x_avg_interp = np.interp(curr_cal_tstamps, cam_tstamps, x_avg)
+            y_avg_interp = np.interp(curr_cal_tstamps, cam_tstamps, y_avg)
+            
+            # Stack x ontop of y
+            avg_interp = np.stack((x_avg_interp, y_avg_interp), axis=0)
+            avg_interps.append(avg_interp)
+        
+        return tuple(avg_interps)
+    
+    def OLDinterpolate_avgkin2cal(self, key) -> [np.ndarray, np.ndarray]:
         """
         Interpolates the average location of the mouse's hand for calcium frame times. 
         Limited to the 2.5 minute chunk of kinematics data specified by the key. 
@@ -256,6 +349,7 @@ class MouseDay:
             cam_avg_coordinates = self.get_avg_coordinates(kin_mat)  # maybe later ill modify this function to compute a weighted average ("true centroid")
             cam_x_avg = cam_avg_coordinates[:, 0]
             cam_y_avg = cam_avg_coordinates[:, 1]
+            # print(cam_avg_coordinates)
             
             # Resizing the kinematics-camera frames to match the kinematics time series
             cam_frames = len(self.kin_tseries)
@@ -265,6 +359,10 @@ class MouseDay:
             cam_x_avg = cam_x_avg[:min_frames]
             cam_y_avg = cam_y_avg[:min_frames]
             cam_tseries = self.kin_tseries[:min_frames]
+            print("variables...")
+            print(self.cal_tseries)
+            print(cam_tseries)
+            print(cam_x_avg)
             
             # Interpolate!
             cam_x_avg_interp = np.interp(self.cal_tseries, cam_tseries, cam_x_avg)
@@ -275,3 +373,9 @@ class MouseDay:
             cam_avg_interps.append(cam_avg_interp)
         
         return cam_avg_interps[0], cam_avg_interps[1]
+    
+    def interpolate_all_avgkin2cal(self):
+        kin_avg_interp = {}
+        for key in self.seg_keys:
+            kin_avg_interp[key] = interpolate_avgkin2cal(key)
+        return kin_avg_interp

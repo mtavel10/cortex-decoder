@@ -31,7 +31,7 @@ def plot_mouseday_data(mouse_day, event_key: str, figsize: Tuple[int, int] = (16
     cam1_avg, cam2_avg = mouse_day.interpolate_avgkin2cal(event_key)
     
     # Get calcium data
-    cal_tseries = mouse_day.cal_tseries
+    cal_tseries = mouse_day.cal_tstamp_dict[event_key]
     # TEMPORARY LIMIT TO FIRST 2.5 MINUTES (4464 FRAMES)
     max_frames = len(cal_tseries)
     cal_spikes = mouse_day.cal_spks[:, :max_frames]
@@ -40,7 +40,7 @@ def plot_mouseday_data(mouse_day, event_key: str, figsize: Tuple[int, int] = (16
     end_time = cal_tseries[-1]
     
     # Get event data
-    cal_event_times = mouse_day.cal_event_times
+    cal_event_times = mouse_day.cal_event_frames
     event_labels = mouse_day.event_labels
     
     # Another temporary limit
@@ -152,7 +152,7 @@ def plot_interp_test(mouse_day, event_key: str, figsize: Tuple[int, int] = (16, 
     fig, axes = plt.subplots(nrows=4, ncols=2, figsize=figsize)
     
     # Regular Data
-    kin_times = mouse_day.kin_tseries
+    kin_times = mouse_day.kin_tstamp_dict[event_key]
     max_frames = len(kin_times)
     curr_kin_mats = mouse_day.kin_mats[event_key]
     cam1_kin_mat, cam2_kin_mat = curr_kin_mats
@@ -186,9 +186,11 @@ def plot_interp_test(mouse_day, event_key: str, figsize: Tuple[int, int] = (16, 
     axes[3, 0].set_title('Camera 2 - Y Coordinate (Regular)')
     
     # Interpolated Data
-    cal_times = mouse_day.cal_tseries
+    cal_times = mouse_day.cal_tstamp_dict[event_key]
     max_frames = len(cal_times)
     cam1_interp, cam2_interp = mouse_day.interpolate_avgkin2cal(event_key)
+    print(cam1_interp)
+    print(cam2_interp)
     cam1_interp = cam1_interp[:, :max_frames]
     cam2_interp = cam2_interp[:, :max_frames]
     
@@ -252,18 +254,30 @@ def plot_interp_test(mouse_day, event_key: str, figsize: Tuple[int, int] = (16, 
     
     return fig
 
+def plot_tseries_tstamps(mouse_day, event_key: str, figsize: Tuple[int, int] = (16, 10)):
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=figsize)
+    print(mouse_day.cal_tseries)
+    axes[0, 0].plot(mouse_day.cal_tseries)
+    axes[0, 1].plot(mouse_day.kin_tseries)
+    axes[1, 0].plot(mouse_day.cal_tstamp_dict[event_key])
+    axes[1, 1].plot(mouse_day.kin_tstamp_dict[event_key])
+    return fig
 
 if __name__ == "__main__":
     mouse_day = MouseDay('mouse25', '20240425')
-    event_keys = list(mouse_day.kin_event_times.keys())
+    event_keys = mouse_day.seg_keys
     event_key = event_keys[0]  # Use first available key
     
     # Create comprehensive plot
-    fig1 = plot_mouseday_data(mouse_day, event_key)
+    # fig1 = plot_mouseday_data(mouse_day, event_key)
+    # plt.show()
+
+    # Test Interpolation function
+    fig4 = plot_interp_test(mouse_day, event_key)
     plt.show()
 
-    # # Test Interpolation function
-    # fig4 = plot_interp_test(mouse_day, event_key)
+    # # Test Tstamps
+    # fig3 = plot_tseries_tstamps(mouse_day, event_key)
     # plt.show()
     
     print("Example usage:")
@@ -271,4 +285,3 @@ if __name__ == "__main__":
     print("event_key = list(mouse_day.kin_event_times.keys())[0]")
     print("fig = plot_mouseday_data(mouse_day, event_key)")
     print("plt.show()")
-    
