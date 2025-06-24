@@ -26,6 +26,10 @@ y = test_mouse.get_trimmed_avg_locs()
 print(X.shape)
 print(y.shape)
 
+print(f"X shape: {X.shape}")
+print(f"X.T @ X would be: {X.shape[1]} x {X.shape[1]}")
+print(f"Estimated memory for X.T @ X: {X.shape[1]**2 * 8 / 1e9:.2f} GB")
+
 # Ridge Regression
 # lam = 0.4
 
