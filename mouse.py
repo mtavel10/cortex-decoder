@@ -1,7 +1,7 @@
+from __future__ import annotations
 import numpy as np
 import pandas as pd
 import src.IO as io
-import json
 
 # Idea: class hierarchy of mice, then each mouse has a day (yippeee)
 class MouseDay: 
@@ -111,12 +111,12 @@ class MouseDay:
         return self._cal_tstamps
     
     @property
-    def cal_tstamp_dict(self) -> dict [str : np.ndarray]:
+    def cal_tstamp_dict(self) -> dict [str, np.ndarray]:
         """Get the calcium time series data."""
         return self._cal_tstamp_dict
 
     @property
-    def kin_tstamp_dict(self) -> dict [str : np.ndarray]:
+    def kin_tstamp_dict(self) -> dict [str, np.ndarray]:
         """Get the kinematic time series data."""
         return self._kin_tstamp_dict
     

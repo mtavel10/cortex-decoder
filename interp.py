@@ -6,8 +6,8 @@ from mouse import MouseDay
 
 # Tracks mouse data and dates imported onto this file system (in prog)
 # Figure out a way to not have to do this manually (read off directory??)
-mice:list[str] = ["mouse25"]
-days:dict[str,list[str]] = {"mouse25": ["20240425"]}
+# mice:list[str] = ["mouse25"]
+# days:dict[str,list[str]] = {"mouse25": ["20240425"]}
 
 
 # for mouseID in mice:
@@ -31,13 +31,13 @@ print(f"X.T @ X would be: {X.shape[1]} x {X.shape[1]}")
 print(f"Estimated memory for X.T @ X: {X.shape[1]**2 * 8 / 1e9:.2f} GB")
 
 # Ridge Regression
-# lam = 0.4
+lam = 0.4
 
-# X2 = X.T @ X
-# w = np.linalg.inv(X2 + lam * np.eye(X2.shape[0])) @ X.T @ y
+X_sqr = X.T @ X
+w = np.linalg.inv(X_sqr + lam * np.eye(X_sqr.shape[0])) @ X.T @ y
 
 # Least Squares Regression
-w = np.linalg.inv(X.T @ X) @ X.T @ y
+# w = np.linalg.inv(X.T @ X) @ X.T @ y
 
 
 # interpolated_data = np.load("test_interps.npy", allow_pickle=True)
