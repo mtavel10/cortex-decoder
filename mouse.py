@@ -75,7 +75,6 @@ class MouseDay:
         self._cal_tstamp_dict = io.load_tstamp_dict(mouseID, day, "calcium")
         self._kin_tstamp_dict = io.load_tstamp_dict(mouseID, day, "cam")
 
-
         self._cal_tstamps = io.load_cal_tstamps(mouseID, day)
         self._cal_event_frames = io.load_cal_event_times(mouseID, day)
         self._kin_event_frames = io.load_cam_event_times(mouseID, day)
@@ -94,21 +93,31 @@ class MouseDay:
         
         self._interpolated_kin_avgs = self.interpolate_all("avg")
 
-    # Getter methods for the data to be accessed outside of the class
-    @property
-    def cal_tseries(self) -> np.ndarray:
-        """Get the calcium time series data."""
-        return self._cal_tseries
+    # # Getter methods for the data to be accessed outside of the class
+    # @property
+    # def cal_tseries(self) -> np.ndarray:
+    #     """Get the calcium time series data."""
+    #     return self._cal_tseries
     
-    @property
-    def kin_tseries(self) -> np.ndarray:
-        """Get the kinematic time series data."""
-        return self._kin_tseries
+    # @property
+    # def kin_tseries(self) -> np.ndarray:
+    #     """Get the kinematic time series data."""
+    #     return self._kin_tseries
 
     @property
     def cal_tstamps(self) -> np.ndarray:
         """Get the calcium time series data."""
         return self._cal_tstamps
+
+    def check_caltime_latency(self):
+        """
+        Checks the differences between each timestamp in the kinematic timeseries. Counts the number of differences that are greater than 35 ms
+        """
+        count = 0
+        for i in range(1, len(self.cal_tstamps)):
+            if (self.cal_tstamps[i] - self.cal_tstamps[i-1]) > 35e6:
+                count += 1
+        print("Number of timestamp gaps greater than 35 ms: ", count)
     
     @property
     def cal_tstamp_dict(self) -> dict [str, np.ndarray]:
@@ -155,7 +164,7 @@ class MouseDay:
     def seg_keys(self) -> list[str]:
         return list(self.kin_event_frames.keys())
 
-    # Calcium camera frames differ from timestamp frames
+    # Calcium camera frames differ from number of timestamps
     @property
     def cal_nframes(self) -> int:
         return len(self.cal_spks[0])
@@ -163,6 +172,14 @@ class MouseDay:
     @property
     def cal_ntimeframes(self) -> int:
         return len(self.cal_tstamps)
+    
+    @property
+    def n_samples(self) -> int:
+        """
+        MOST IMPORTANT - the number of valid samples in this dataset
+        Calcium probability estimation algorithm doesn't compute for the first and last 32 frames, so this is the number of valid timepoints of data
+        """
+        return self.cal_nframes - 64
     
     # Number of frames varies per recording segment... should these even be properties?
     # Assumes the frames are uniform across cameras
@@ -365,10 +382,11 @@ class MouseDay:
         Returns a numpy array of size (n_timepoints x 4 locations)
         Represents the average x and y locations of the mouse's hand for two camera views
         """
+        # TALK TO GABRIELLA ABOUT THE VALIDITY OF THIS FUNC
         # First and last 32 frames are NaN because of spike probability estimate algorithm
         trimmed1 = self.get_all_avg_locations()[32:-32]
-        # More calcium timestamps then camera frames
-        trimmed2 = trimmed1[:(self.cal_nframes-64)]
+        # More calcium timestamps then calcium camera frames
+        trimmed2 = trimmed1[:(self.n_samples)]
         return trimmed2
     
     def get_beh_labels(self):
@@ -377,15 +395,15 @@ class MouseDay:
         Handles "non-event" timepoints by setting the label to -1. 
         """
         beh_labels = []
-        print(self.cal_event_frames)
-        print(self.event_labels)
-        print(self.cal_event_frames[-1])
         for frame in range(0, int(self.cal_event_frames[-1])):
-            event_idx = np.where(self.cal_event_frames == frame)[0]
-            print(event_idx)
-            beh_labels.append(self.event_labels[event_idx])
-    
-            # beh_labels.append(-1)
+            event_idx_list = np.where(self.cal_event_frames == frame)[0]
+            if not event_idx_list:
+                    beh_labels.append(-1)
+            else:
+                event_idx = event_idx_list[0]
+                beh_labels.append(self.event_labels[event_idx])
         
-        print(len(beh_labels))
+        # trim to fit the number of valid calcium frames
+        beh_labels = beh_labels[:self.n_samples]
+        
         return np.array(beh_labels)
