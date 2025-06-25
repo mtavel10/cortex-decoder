@@ -353,12 +353,39 @@ class MouseDay:
         all_avg_locations = np.hstack([all_cam1, all_cam2])
         return all_avg_locations
 
-    def get_trimmed_spks(self):
-        return self.cal_spks[32:-32, 32:-32]
+    def get_trimmed_spks(self) -> np.ndarray:
+        """
+        Returns a numpy array of size (n_timepoints x n_neurons)
+        Represents the estimated spike probabilities across all timepoints
+        """
+        return self.cal_spks[32:-32, 32:-32].T
 
     def get_trimmed_avg_locs(self):
+        """
+        Returns a numpy array of size (n_timepoints x 4 locations)
+        Represents the average x and y locations of the mouse's hand for two camera views
+        """
         # First and last 32 frames are NaN because of spike probability estimate algorithm
         trimmed1 = self.get_all_avg_locations()[32:-32]
         # More calcium timestamps then camera frames
         trimmed2 = trimmed1[:(self.cal_nframes-64)]
         return trimmed2
+    
+    def get_beh_labels(self):
+        """ 
+        Returns a 1D numpy array of behavior labels for all valid timepoints (calcium frames) for the day. 
+        Handles "non-event" timepoints by setting the label to -1. 
+        """
+        beh_labels = []
+        print(self.cal_event_frames)
+        print(self.event_labels)
+        print(self.cal_event_frames[-1])
+        for frame in range(0, int(self.cal_event_frames[-1])):
+            event_idx = np.where(self.cal_event_frames == frame)[0]
+            print(event_idx)
+            beh_labels.append(self.event_labels[event_idx])
+    
+            # beh_labels.append(-1)
+        
+        print(len(beh_labels))
+        return np.array(beh_labels)
