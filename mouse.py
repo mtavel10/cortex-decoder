@@ -170,7 +170,7 @@ class MouseDay:
         return len(self.cal_spks[0])
     
     @property
-    def cal_ntimeframes(self) -> int:
+    def cal_ntimestamps(self) -> int:
         return len(self.cal_tstamps)
     
     @property
@@ -375,7 +375,7 @@ class MouseDay:
         Returns a numpy array of size (n_timepoints x n_neurons)
         Represents the estimated spike probabilities across all timepoints
         """
-        return self.cal_spks[32:-32, 32:-32].T
+        return self.cal_spks[:, 32:-32].T
 
     def get_trimmed_avg_locs(self):
         """
@@ -395,7 +395,7 @@ class MouseDay:
         Handles "non-event" timepoints by setting the label to -1. 
         """
         beh_labels = []
-        for frame in range(0, int(self.cal_event_frames[-1])):
+        for frame in range(0, int(self.cal_nframes)):
             event_idx_list = np.where(self.cal_event_frames == frame)[0]
             if not event_idx_list:
                     beh_labels.append(-1)
@@ -404,6 +404,6 @@ class MouseDay:
                 beh_labels.append(self.event_labels[event_idx])
         
         # trim to fit the number of valid calcium frames
-        beh_labels = beh_labels[:self.n_samples]
+        beh_labels = beh_labels[32:-32]
         
         return np.array(beh_labels)

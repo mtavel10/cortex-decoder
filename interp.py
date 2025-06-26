@@ -40,15 +40,30 @@ def ridge_regression(mouse_day: MouseDay):
         # print("Mean scored error: ", mean_squared_error(y_test, y_pred))
 
 def latency_check(mouse_day: MouseDay):
-    print("# of timestamps (calcium): ", test_mouse.cal_ntimeframes)
+    print("# of timestamps (calcium): ", test_mouse.cal_ntimestamps)
     print("# of datapoints (calcium): ", test_mouse.cal_nframes)
     mouse_day.check_caltime_latency()
+
+def dimensions_check(mouse_day: MouseDay):
+    test_locs = mouse_day.get_trimmed_avg_locs()
+    test_untrimmedlocs = mouse_day.get_all_avg_locations()
+    test_spikes = mouse_day.get_trimmed_spks()
+    test_labels = mouse_day.get_beh_labels()
+
+    print("No trim location shape: ", test_untrimmedlocs.shape)
+    print("No Trim Spikes shape: ", mouse_day.cal_spks.T.shape)
+    print("Trimmed Location shape: ", test_locs.shape)
+    print("Trimmed Spikes shape: ", test_spikes.shape)
+    
+    # print(mouse_day.cal_spks[:, 32:-32])
+    print("Num labels: ", len(test_labels))
 
 if __name__ == "__main__":
     test_mouse = MouseDay("mouse25", "20240425")
 
-    ridge_regression(test_mouse)
-
+    # ridge_regression(test_mouse)
+    latency_check(test_mouse)
+   #  dimensions_check(test_mouse)
 
     
     # print(X.shape)
