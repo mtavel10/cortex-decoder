@@ -109,6 +109,7 @@ class MouseDay:
         """Get the calcium time series data."""
         return self._cal_tstamps
 
+
     def check_caltime_latency(self):
         """
         Checks the differences between each timestamp in the kinematic timeseries. Counts the number of differences that are greater than 35 ms
@@ -171,7 +172,10 @@ class MouseDay:
     
     @property
     def cal_ntimestamps(self) -> int:
-        return len(self.cal_tstamps)
+        tstamp_count = 0
+        for seg in self.cal_tstamp_dict:
+            tstamp_count += len(self.cal_tstamp_dict[seg])
+        return tstamp_count
     
     @property
     def n_samples(self) -> int:
@@ -382,28 +386,49 @@ class MouseDay:
         Returns a numpy array of size (n_timepoints x 4 locations)
         Represents the average x and y locations of the mouse's hand for two camera views
         """
-        # TALK TO GABRIELLA ABOUT THE VALIDITY OF THIS FUNC
         # First and last 32 frames are NaN because of spike probability estimate algorithm
         trimmed1 = self.get_all_avg_locations()[32:-32]
-        # More calcium timestamps then calcium camera frames
-        trimmed2 = trimmed1[:(self.n_samples)]
-        return trimmed2
+        return trimmed1
     
+    # FOR MONDAY: TEST THIS FUNCTION
     def get_beh_labels(self):
         """ 
         Returns a 1D numpy array of behavior labels for all valid timepoints (calcium frames) for the day. 
         Handles "non-event" timepoints by setting the label to -1. 
         """
+        max_beh_frames = 9
+        # Counter variable tracks whether the frame is during a behavior (>0)
+        beh_frame_count = 0
+        curr_beh_label = -1
         beh_labels = []
         for frame in range(0, int(self.cal_nframes)):
+            if beh_frame_count > max_beh_frames:
+                curr_beh_label = -1
+                beh_frame_count = 0
+
             event_idx_list = np.where(self.cal_event_frames == frame)[0]
-            if not event_idx_list:
-                    beh_labels.append(-1)
-            else:
+            # A "non-behavior" frame
+            if not event_idx_list and beh_frame_count == 0:
+                # curr_beh_label shouldd be -1 but if it isn't that's a problem
+                beh_labels.append(curr_beh_label)
+            # An ongoing behavior frame (empty only because it wasn't the starting frame index)
+            elif not event_idx_list and beh_frame_count > 0:
+                beh_labels.append(curr_beh_label)
+                beh_frame_count += 1
+            # A new behavior and the current frame count is empty
+            elif event_idx_list and beh_frame_count == 0:
                 event_idx = event_idx_list[0]
-                beh_labels.append(self.event_labels[event_idx])
-        
-        # trim to fit the number of valid calcium frames
-        beh_labels = beh_labels[32:-32]
+                curr_beh_label = self.event_labels[event_idx]
+                beh_labels.append(curr_beh_label)
+                beh_frame_count += 1
+            # A "behavior frame" that interrupts a running behavior (two behaviors occur next to eachother in less than the max_beh_frames)
+            elif event_idx_list and beh_frame_count > 0:
+                event_idx = event_idx_list[0]
+                curr_beh_label = self.event_labels[event_idx]
+                beh_labels.append(curr_beh_label)
+                beh_frame_count = 0
         
         return np.array(beh_labels)
+    
+    def get_trimmed_beh_labels(self):
+        return self.get_beh_labels()[32:-32]

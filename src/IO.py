@@ -141,13 +141,9 @@ def load_tstamp_dict(mouseID, day, type):
         Seconds since Unix Epoch (float) per camera frame (for either calcium camera or kinematics camera, as specified by type param)
     """
     s2p_fld = get_s2p_fld(mouseID, day)
-    print(s2p_fld, f"/tseries/{type}_timestamps.pkl")
     tstamps = load_pickle(f"{s2p_fld}/tseries/{type}_timestamps.pkl")
     for event in tstamps:
         tstamps[event] = tstamps[event].to_numpy(dtype=float)
-        if type == "calcium":
-            print("num stamps in this event: ", len(tstamps[event]))
-            print("stamps in this event: ", tstamps[event])
     
     return tstamps
 
