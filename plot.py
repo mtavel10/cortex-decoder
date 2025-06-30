@@ -263,6 +263,102 @@ def plot_tseries_tstamps(mouse_day, event_key: str, figsize: Tuple[int, int] = (
     axes[1, 1].plot(mouse_day.kin_tstamp_dict[event_key])
     return fig
 
+from typing import Tuple
+import matplotlib.pyplot as plt
+import numpy as np
+
+def plot_r2_scores(behaviors: dict[int, str], beh_models_scores: list[list[float]], general_model_score: list[float], figsize: Tuple[int, int]=(16, 10)):
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
+    
+    # Calculate means and standard deviations for behavior models
+    beh_means = [np.mean(scores) for scores in beh_models_scores]
+    beh_stds = [np.std(scores) for scores in beh_models_scores]
+    
+    # Calculate mean and standard deviation for general model
+    general_mean = np.mean(general_model_score)
+    general_std = np.std(general_model_score)
+    
+    # Prepare data for plotting
+    labels = list(behaviors.values()) + ["General Model"]
+    means = beh_means + [general_mean]
+    stds = beh_stds + [general_std]
+    
+    # Create bar plot with error bars
+    bars = ax.bar(labels, means, yerr=stds, capsize=5, alpha=0.7, 
+                  color=['skyblue'] * len(behaviors) + ['orange'])
+    
+    # Customize the plot
+    ax.set_ylim(-1, 1)
+    ax.set_ylabel("R² Score")
+    ax.set_xlabel("Model")
+    ax.set_title("Model Performance: Mean R² Scores with Standard Deviations")
+    ax.grid(axis='y', alpha=0.3)
+    
+    # Rotate x-axis labels if there are many behaviors
+    if len(labels) > 5:
+        plt.xticks(rotation=45, ha='right')
+    
+    # Add value labels on top of bars
+    for bar, mean, std in zip(bars, means, stds):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height + std + 0.02,
+                f'{mean:.3f}±{std:.3f}', ha='center', va='bottom', fontsize=9)
+    
+    plt.tight_layout()
+    plt.show()
+
+def plot_kin_predictions(true_positions: np.ndarray, pred_positions: np.ndarray, figsize: Tuple[int, int]=(16, 10)):
+    """
+    True and pred positions are shape (nsamples, 4)
+    Each column holds the following data:
+    cam1_x cam1_y cam2_x cam2_y
+    """
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=figsize)
+    
+    # Camera 1 X positions
+    axes[0, 0].plot(true_positions[:, 0], 'b-', label="True", linewidth=1.5)
+    axes[0, 0].plot(pred_positions[:, 0], 'r-', label="Predicted", linewidth=1.5, alpha=0.8)
+    axes[0, 0].set_title("Camera 1 - X Position")
+    axes[0, 0].set_xlabel("Time (samples)")
+    axes[0, 0].set_ylabel("X Position (pixels)")
+    axes[0, 0].legend()
+    axes[0, 0].grid(True, alpha=0.3)
+    
+    # Camera 1 Y positions
+    axes[0, 1].plot(true_positions[:, 1], 'b-', label="True", linewidth=1.5)
+    axes[0, 1].plot(pred_positions[:, 1], 'r-', label="Predicted", linewidth=1.5, alpha=0.8)
+    axes[0, 1].set_title("Camera 1 - Y Position")
+    axes[0, 1].set_xlabel("Time (samples)")
+    axes[0, 1].set_ylabel("Y Position (pixels)")
+    axes[0, 1].legend()
+    axes[0, 1].grid(True, alpha=0.3)
+    
+    # Camera 2 X positions
+    axes[1, 0].plot(true_positions[:, 2], 'b-', label="True", linewidth=1.5)
+    axes[1, 0].plot(pred_positions[:, 2], 'r-', label="Predicted", linewidth=1.5, alpha=0.8)
+    axes[1, 0].set_title("Camera 2 - X Position")
+    axes[1, 0].set_xlabel("Time (samples)")
+    axes[1, 0].set_ylabel("X Position (pixels)")
+    axes[1, 0].legend()
+    axes[1, 0].grid(True, alpha=0.3)
+    
+    # Camera 2 Y positions
+    axes[1, 1].plot(true_positions[:, 3], 'b-', label="True", linewidth=1.5)
+    axes[1, 1].plot(pred_positions[:, 3], 'r-', label="Predicted", linewidth=1.5, alpha=0.8)
+    axes[1, 1].set_title("Camera 2 - Y Position")
+    axes[1, 1].set_xlabel("Time (samples)")
+    axes[1, 1].set_ylabel("Y Position (pixels)")
+    axes[1, 1].legend()
+    axes[1, 1].grid(True, alpha=0.3)
+    
+    # Add overall title
+    fig.suptitle("Kinematic Predictions: True vs Predicted Positions", fontsize=16, fontweight='bold')
+    
+    # Adjust layout to prevent overlap
+    plt.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
     mouse_day = MouseDay('mouse25', '20240425')
     event_keys = mouse_day.seg_keys
@@ -277,7 +373,10 @@ if __name__ == "__main__":
     #     fig4 = plot_interp_test(mouse_day, key)
     #     plt.show()
 
-    # # Test Tstamps
+    # # t("mouse_day = MouseDay('mouse25', '20240425')")
+    print("event_key = list(mouse_day.kin_event_times.keys())[0]")
+    print("fig = plot_mouseday_data(mouse_day, event_key)")
+    print("plt.show()")
     # fig3 = plot_tseries_tstamps(mouse_day, event_key)
     # plt.show()
     

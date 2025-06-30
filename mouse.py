@@ -62,10 +62,11 @@ class MouseDay:
     BODYPARTS = ['d1middle', 'd2tip', 'd2middle', 'd2knuckle', 'd3tip', 'd3middle',	'd3knuckle', 'd4tip', 'd4middle', 'wrist', 'wrist_outer', 'elbow', 'elbow_crook', 'pellet', 'pedestal', 'p2d1tip']
     N_PARTS = len(BODYPARTS)
     CUTOFF = 0.4
+    BEHAVIOR_LABELS = {0: 'reach', 1: 'grasp', 2: 'carry', 3: 'non movement/kept jumping', 4: 'fidget', 5: 'eating', 6: 'grooming', -1: 'non behavior event'}
 
     def __init__(self, mouseID, day):
         self.mouseID : str = mouseID
-        self.day : str = day
+        self.day : str = day                
 
         # Load all the data
         # # Keeping these for debugging purposes as I scale up to all time series
@@ -394,38 +395,36 @@ class MouseDay:
     def get_beh_labels(self):
         """ 
         Returns a 1D numpy array of behavior labels for all valid timepoints (calcium frames) for the day. 
+        Each event frame indicates the "start" of a behavior, so it sets the subsequent 8 frames to that label (unless interrupted by another behavior)
         Handles "non-event" timepoints by setting the label to -1. 
         """
-        max_beh_frames = 9
+        max_beh_frames = 8
         # Counter variable tracks whether the frame is during a behavior (>0)
         beh_frame_count = 0
         curr_beh_label = -1
         beh_labels = []
         for frame in range(0, int(self.cal_nframes)):
-            if beh_frame_count > max_beh_frames:
-                curr_beh_label = -1
-                beh_frame_count = 0
 
             event_idx_list = np.where(self.cal_event_frames == frame)[0]
-            # A "non-behavior" frame
-            if not event_idx_list and beh_frame_count == 0:
-                # curr_beh_label shouldd be -1 but if it isn't that's a problem
+            # There is no event label for this frame
+            if not event_idx_list:
                 beh_labels.append(curr_beh_label)
-            # An ongoing behavior frame (empty only because it wasn't the starting frame index)
-            elif not event_idx_list and beh_frame_count > 0:
-                beh_labels.append(curr_beh_label)
-                beh_frame_count += 1
-            # A new behavior and the current frame count is empty
-            elif event_idx_list and beh_frame_count == 0:
+                # An ongoing behavior
+                if beh_frame_count > 0:
+                    beh_frame_count += 1
+            # A new event starts at this frame
+            else:
                 event_idx = event_idx_list[0]
                 curr_beh_label = self.event_labels[event_idx]
                 beh_labels.append(curr_beh_label)
-                beh_frame_count += 1
-            # A "behavior frame" that interrupts a running behavior (two behaviors occur next to eachother in less than the max_beh_frames)
-            elif event_idx_list and beh_frame_count > 0:
-                event_idx = event_idx_list[0]
-                curr_beh_label = self.event_labels[event_idx]
-                beh_labels.append(curr_beh_label)
+                # Checks whether we're interrupting an ongoing event
+                if beh_frame_count == 0:
+                    beh_frame_count += 1
+                else:
+                    beh_frame_count = 1
+    
+            if beh_frame_count == max_beh_frames:
+                curr_beh_label = -1
                 beh_frame_count = 0
         
         return np.array(beh_labels)
