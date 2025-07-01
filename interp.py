@@ -27,7 +27,7 @@ def general_ridge(mouse_day: MouseDay, n_trials: int=10):
         y_train, y_test = y[train_idcs], y[test_idcs]
         
         # Cross-validate to find the best alpha
-        ridge = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0])
+        ridge = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0], fit_intercept=False)
 
         # Train the model
         ridge.fit(X_train, y_train)
@@ -44,12 +44,9 @@ def general_ridge(mouse_day: MouseDay, n_trials: int=10):
     avg_w *= (1/score_sum)
     
     # Use average weights to make predictions on the kinematics data
-    print(X.shape)
-    print(avg_w.shape)
     y_pred = X @ avg_w.T
-    myplot.plot_kin_predictions(y, y_pred)
     
-    return avg_w, scores
+    return avg_w, scores, y, y_pred
 
 def ridge_by_beh(mouse_day: MouseDay, n_trials: int=10):
     """
@@ -122,12 +119,18 @@ def dimensions_check(mouse_day: MouseDay):
 
 if __name__ == "__main__":
     test_mouse = MouseDay("mouse25", "20240425")
+    # print("number of caltstamps: ", test_mouse.cal_ntimestamps)
+    # print("number of cal frames: ", test_mouse.cal_nframes)
+    # print("caltstamps (full): ", test_mouse.cal_tstamps)
+    # print("length of that array: ", len(test_mouse.cal_tstamps))
+
     # for label in test_mouse.get_beh_labels():
     #     print(label)
+    
     # latency_check(test_mouse)
     # dimensions_check(test_mouse)
 
-    gen_weights, gen_scores = general_ridge(test_mouse)
+    # gen_weights, gen_scores = general_ridge(test_mouse)
     # print(avg_weights)
     # print(scores)
     # beh_weights, beh_scores = weights_by_beh = ridge_by_beh(test_mouse)

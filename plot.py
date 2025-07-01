@@ -5,7 +5,7 @@ from matplotlib.patches import Rectangle
 import seaborn as sns
 from typing import List, Dict, Tuple
 from mouse import MouseDay
-import sys
+import interp
 
 # for now, only working with the first 4464 frames for Mouse25 20240425
 # need to filter the cascade spike data before plotting
@@ -263,10 +263,6 @@ def plot_tseries_tstamps(mouse_day, event_key: str, figsize: Tuple[int, int] = (
     axes[1, 1].plot(mouse_day.kin_tstamp_dict[event_key])
     return fig
 
-from typing import Tuple
-import matplotlib.pyplot as plt
-import numpy as np
-
 def plot_r2_scores(behaviors: dict[int, str], beh_models_scores: list[list[float]], general_model_score: list[float], figsize: Tuple[int, int]=(16, 10)):
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
     
@@ -307,46 +303,47 @@ def plot_r2_scores(behaviors: dict[int, str], beh_models_scores: list[list[float
     plt.tight_layout()
     plt.show()
 
-def plot_kin_predictions(true_positions: np.ndarray, pred_positions: np.ndarray, figsize: Tuple[int, int]=(16, 10)):
+def plot_kin_predictions(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10)):
     """
     True and pred positions are shape (nsamples, 4)
     Each column holds the following data:
     cam1_x cam1_y cam2_x cam2_y
     """
+    avg_w, scores, true_positions, pred_positions = interp.general_ridge(mouse_day)
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=figsize)
-    
+    trimmed_tstamps = mouse_day.get_trimmed_cal_tstamps()
     # Camera 1 X positions
-    axes[0, 0].plot(true_positions[:, 0], 'b-', label="True", linewidth=1.5)
-    axes[0, 0].plot(pred_positions[:, 0], 'r-', label="Predicted", linewidth=1.5, alpha=0.8)
+    axes[0, 0].plot(trimmed_tstamps, true_positions[:, 0], 'b-', label="True", linewidth=1.5)
+    axes[0, 0].plot(trimmed_tstamps, pred_positions[:, 0], 'r-', label="Predicted", linewidth=1.5, alpha=0.5)
     axes[0, 0].set_title("Camera 1 - X Position")
-    axes[0, 0].set_xlabel("Time (samples)")
+    axes[0, 0].set_xlabel("Time (since Unix Epoch - ns)")
     axes[0, 0].set_ylabel("X Position (pixels)")
     axes[0, 0].legend()
     axes[0, 0].grid(True, alpha=0.3)
     
     # Camera 1 Y positions
-    axes[0, 1].plot(true_positions[:, 1], 'b-', label="True", linewidth=1.5)
-    axes[0, 1].plot(pred_positions[:, 1], 'r-', label="Predicted", linewidth=1.5, alpha=0.8)
+    axes[0, 1].plot(trimmed_tstamps, true_positions[:, 1], 'b-', label="True", linewidth=1.5)
+    axes[0, 1].plot(trimmed_tstamps, pred_positions[:, 1], 'r-', label="Predicted", linewidth=1.5, alpha=0.5)
     axes[0, 1].set_title("Camera 1 - Y Position")
-    axes[0, 1].set_xlabel("Time (samples)")
+    axes[0, 1].set_xlabel("Time (since Unix Epoch - ns)")
     axes[0, 1].set_ylabel("Y Position (pixels)")
     axes[0, 1].legend()
     axes[0, 1].grid(True, alpha=0.3)
     
     # Camera 2 X positions
-    axes[1, 0].plot(true_positions[:, 2], 'b-', label="True", linewidth=1.5)
-    axes[1, 0].plot(pred_positions[:, 2], 'r-', label="Predicted", linewidth=1.5, alpha=0.8)
+    axes[1, 0].plot(trimmed_tstamps, true_positions[:, 2], 'b-', label="True", linewidth=1.5)
+    axes[1, 0].plot(trimmed_tstamps, pred_positions[:, 2], 'r-', label="Predicted", linewidth=1.5, alpha=0.5)
     axes[1, 0].set_title("Camera 2 - X Position")
-    axes[1, 0].set_xlabel("Time (samples)")
+    axes[1, 0].set_xlabel("Time (since Unix Epoch - ns)")
     axes[1, 0].set_ylabel("X Position (pixels)")
     axes[1, 0].legend()
     axes[1, 0].grid(True, alpha=0.3)
     
     # Camera 2 Y positions
-    axes[1, 1].plot(true_positions[:, 3], 'b-', label="True", linewidth=1.5)
-    axes[1, 1].plot(pred_positions[:, 3], 'r-', label="Predicted", linewidth=1.5, alpha=0.8)
+    axes[1, 1].plot(trimmed_tstamps, true_positions[:, 3], 'b-', label="True", linewidth=1.5)
+    axes[1, 1].plot(trimmed_tstamps, pred_positions[:, 3], 'r-', label="Predicted", linewidth=1.5, alpha=0.5)
     axes[1, 1].set_title("Camera 2 - Y Position")
-    axes[1, 1].set_xlabel("Time (samples)")
+    axes[1, 1].set_xlabel("Time (since Unix Epoch - ns)")
     axes[1, 1].set_ylabel("Y Position (pixels)")
     axes[1, 1].legend()
     axes[1, 1].grid(True, alpha=0.3)
@@ -356,14 +353,21 @@ def plot_kin_predictions(true_positions: np.ndarray, pred_positions: np.ndarray,
     
     # Adjust layout to prevent overlap
     plt.tight_layout()
-    plt.show()
+    return fig
 
+def plot_kin_predictions_by_beh(mouse_day: MouseDay, figsize: Tule[int, int]=(16, 10)):
+    fig, axes = plt.subplots(nrows=2, nols=2, figsize=figsize)
+    return fig
 
 if __name__ == "__main__":
     mouse_day = MouseDay('mouse25', '20240425')
     event_keys = mouse_day.seg_keys
     event_key = event_keys[0]  # Use first available key
     
+    # Plotting Ridge Regression results
+    fig2 = plot_kin_predictions(mouse_day)
+    plt.show()
+
     # Create comprehensive plot
     # fig1 = plot_mouseday_data(mouse_day, event_key)
     # plt.show()
@@ -372,16 +376,3 @@ if __name__ == "__main__":
     # for key in event_keys:
     #     fig4 = plot_interp_test(mouse_day, key)
     #     plt.show()
-
-    # # t("mouse_day = MouseDay('mouse25', '20240425')")
-    print("event_key = list(mouse_day.kin_event_times.keys())[0]")
-    print("fig = plot_mouseday_data(mouse_day, event_key)")
-    print("plt.show()")
-    # fig3 = plot_tseries_tstamps(mouse_day, event_key)
-    # plt.show()
-    
-    print("Example usage:")
-    print("mouse_day = MouseDay('mouse25', '20240425')")
-    print("event_key = list(mouse_day.kin_event_times.keys())[0]")
-    print("fig = plot_mouseday_data(mouse_day, event_key)")
-    print("plt.show()")

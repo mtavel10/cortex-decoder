@@ -70,13 +70,13 @@ class MouseDay:
 
         # Load all the data
         # # Keeping these for debugging purposes as I scale up to all time series
-        self._cal_tseries = io.load_tseries(mouseID, day, "calcium")
-        self._kin_tseries = io.load_tseries(mouseID, day, "cam")
+        # self._cal_tseries = io.load_tseries(mouseID, day, "calcium")
+        # self._kin_tseries = io.load_tseries(mouseID, day, "cam")
 
         self._cal_tstamp_dict = io.load_tstamp_dict(mouseID, day, "calcium")
         self._kin_tstamp_dict = io.load_tstamp_dict(mouseID, day, "cam")
 
-        self._cal_tstamps = io.load_cal_tstamps(mouseID, day)
+        # self._cal_tstamps = io.load_cal_tstamps(mouseID, day)
         self._cal_event_frames = io.load_cal_event_times(mouseID, day)
         self._kin_event_frames = io.load_cam_event_times(mouseID, day)
         self._event_labels = io.load_event_labels(mouseID, day)
@@ -108,8 +108,10 @@ class MouseDay:
     @property
     def cal_tstamps(self) -> np.ndarray:
         """Get the calcium time series data."""
-        return self._cal_tstamps
-
+        full_tstamps = []
+        for seg in self.cal_tstamp_dict:
+            full_tstamps = np.append(full_tstamps, self.cal_tstamp_dict[seg])
+        return full_tstamps
 
     def check_caltime_latency(self):
         """
@@ -173,10 +175,7 @@ class MouseDay:
     
     @property
     def cal_ntimestamps(self) -> int:
-        tstamp_count = 0
-        for seg in self.cal_tstamp_dict:
-            tstamp_count += len(self.cal_tstamp_dict[seg])
-        return tstamp_count
+        return len(self.cal_tstamps)
     
     @property
     def n_samples(self) -> int:
@@ -193,6 +192,9 @@ class MouseDay:
     
     def get_kin_ntimeframes(self, key) -> int:
         return len(self.kin_tstamp_dict[key])
+
+    def get_trimmed_cal_tstamps(self) -> np.ndarray:
+        return self.cal_tstamps[32:-32]
 
     # Not in use, changed the list of boydparts to a static variable
     def get_bodyparts(self, df):
