@@ -46,6 +46,8 @@ def general_ridge(mouse_day: MouseDay, n_trials: int=10):
     # Use average weights to make predictions on the kinematics data
     y_pred = X @ avg_w.T
     
+    # saves the weights and scores
+    io.save_decoded_data(mouse_day.mouseID, mouse_day.day, avg_w, scores, model_type="general")
     return avg_w, scores, y, y_pred
 
 def ridge_by_beh(mouse_day: MouseDay, n_trials: int=10):
@@ -73,7 +75,7 @@ def ridge_by_beh(mouse_day: MouseDay, n_trials: int=10):
             y_train, y_test = curr_y[train_idcs], curr_y[test_idcs]
             
             # CV to find best alpha
-            ridge = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0])
+            ridge = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0], fit_intercept=False)
 
             # Train the model
             ridge.fit(X_train, y_train)
@@ -94,7 +96,16 @@ def ridge_by_beh(mouse_day: MouseDay, n_trials: int=10):
         all_weights.append(avg_w)
         all_scores.append(scores)
     
-    return all_weights, all_scores
+    # A list of predictions by model
+    y_preds = []
+    for weights in all_weights:
+        y_preds.append(X @ weights.T)
+    
+    # save weights and scores
+    for label, weights, scores in zip(labels.values(), all_weights, all_scores):
+        io.save_decoded_data(mouse_day.mouseID, mouse_day.day, weights, scores, model_type=label)
+
+    return all_weights, all_scores, y, y_preds
       
 def latency_check(mouse_day: MouseDay):
     print("# of timestamps (calcium): ", test_mouse.cal_ntimestamps)
@@ -130,8 +141,8 @@ if __name__ == "__main__":
     # latency_check(test_mouse)
     # dimensions_check(test_mouse)
 
-    # gen_weights, gen_scores = general_ridge(test_mouse)
+   #  gen_weights, gen_scores, y, y_pred = general_ridge(test_mouse)
     # print(avg_weights)
     # print(scores)
-    # beh_weights, beh_scores = weights_by_beh = ridge_by_beh(test_mouse)
+    all_weights, all_scores, y, y_preds = ridge_by_beh(test_mouse)
     # myplot.plot_r2_scores(test_mouse.BEHAVIOR_LABELS, beh_scores, gen_scores)

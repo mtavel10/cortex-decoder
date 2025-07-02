@@ -62,7 +62,7 @@ class MouseDay:
     BODYPARTS = ['d1middle', 'd2tip', 'd2middle', 'd2knuckle', 'd3tip', 'd3middle',	'd3knuckle', 'd4tip', 'd4middle', 'wrist', 'wrist_outer', 'elbow', 'elbow_crook', 'pellet', 'pedestal', 'p2d1tip']
     N_PARTS = len(BODYPARTS)
     CUTOFF = 0.4
-    BEHAVIOR_LABELS = {0: 'reach', 1: 'grasp', 2: 'carry', 3: 'non movement/kept jumping', 4: 'fidget', 5: 'eating', 6: 'grooming', -1: 'non behavior event'}
+    BEHAVIOR_LABELS = {0: 'reach', 1: 'grasp', 2: 'carry', 3: 'non_movement_or_kept_jumping', 4: 'fidget', 5: 'eating', 6: 'grooming', -1: 'non_behavior_event'}
 
     def __init__(self, mouseID, day):
         self.mouseID : str = mouseID

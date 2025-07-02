@@ -6,6 +6,7 @@ import seaborn as sns
 from typing import List, Dict, Tuple
 from mouse import MouseDay
 import interp
+import src.IO as io
 
 # for now, only working with the first 4464 frames for Mouse25 20240425
 # need to filter the cascade spike data before plotting
@@ -309,7 +310,11 @@ def plot_kin_predictions(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10))
     Each column holds the following data:
     cam1_x cam1_y cam2_x cam2_y
     """
-    avg_w, scores, true_positions, pred_positions = interp.general_ridge(mouse_day)
+    w = io.load_decoded_weights(mouse_day.mouseID, mouse_day.day)
+    X = mouse_day.get_trimmed_spks()
+    true_positions = mouse_day.get_trimmed_avg_locs()
+    pred_positions = X @ w
+
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=figsize)
     trimmed_tstamps = mouse_day.get_trimmed_cal_tstamps()
     # Camera 1 X positions
@@ -355,9 +360,32 @@ def plot_kin_predictions(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10))
     plt.tight_layout()
     return fig
 
-def plot_kin_predictions_by_beh(mouse_day: MouseDay, figsize: Tule[int, int]=(16, 10)):
-    fig, axes = plt.subplots(nrows=2, nols=2, figsize=figsize)
+def plot_kin_predictions_by_model(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10)):
+    X = mouse_day.get_trimmed_spks()
+    true_positions = mouse_day.get_trimmed_avg_locs()
+    trimmed_tstamps = mouse_day.get_trimmed_cal_tstamps()
+    model_types = list(mouse_day.BEHAVIOR_LABELS.values()) + ['general']
+
+    fig, axes = plt.subplot_mosaic([['reach', 'grasp', 'carry'],
+                                    ['non_movement_or_kept_jumping', 'fidget', 'eating'],
+                                    ['grooming', 'non_behavior_event', 'general']], figsize=figsize)
+
+    for i, model in enumerate(model_types):
+        weights = io.load_decoded_weights(mouse_day.mouseID, mouse_day.day, model)
+        pred_positions = X @ weights
+        axes[model].plot(trimmed_tstamps, true_positions[:, 0], 'b-', label="True", linewidth=1.5)
+        axes[model].plot(trimmed_tstamps, pred_positions[:, 0], 'r-', label="Predicted", linewidth=1.5, alpha=0.5)
+        axes[model].set_title(f"{model} predictions")
+        axes[model].set_xlabel("Time (since Unix Epoch - ns)")
+        axes[model].set_ylabel("X Position (pixels)")
+        axes[model].legend()
+        axes[model].grid(True, alpha=0.3)
+        
+    # Add overall title
+    fig.suptitle("Cam1 X Kinematics: True vs Predicted Positions by Behavior Model", fontsize=16, fontweight='bold')
+    fig.tight_layout()
     return fig
+
 
 if __name__ == "__main__":
     mouse_day = MouseDay('mouse25', '20240425')
@@ -365,7 +393,7 @@ if __name__ == "__main__":
     event_key = event_keys[0]  # Use first available key
     
     # Plotting Ridge Regression results
-    fig2 = plot_kin_predictions(mouse_day)
+    fig2 = plot_kin_predictions_by_model(mouse_day)
     plt.show()
 
     # Create comprehensive plot

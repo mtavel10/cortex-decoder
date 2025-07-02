@@ -156,3 +156,14 @@ def load_cal_tstamps(mouseID, day):
     s2p_fld = get_s2p_fld(mouseID, day)
     cal_tstamps = np.load(f"{s2p_fld}/tseries/calcium_timestamps.npy")
     return cal_tstamps.astype('datetime64[ns]').astype(float)
+
+def save_decoded_data(mouseID: str, day: str, weights: np.ndarray, scores: list[float], model_type="general"):
+    file_path = f"{get_drive(mouseID)}/decoded_data/{mouseID}/{day}"
+    os.makedirs(file_path, mode=0o777, exist_ok=True)
+    np.save(f"{file_path}/{model_type}_weights.npy", weights)
+    np.save(f"{file_path}/{model_type}_scores.npy", scores)
+
+def load_decoded_weights(mouseID: str, day: str, model_type="general"):
+    file_path = f"{get_drive(mouseID)}/decoded_data/{mouseID}/{day}"
+    weights = np.load(f"{file_path}/{model_type}_weights.npy")
+    return weights.T
