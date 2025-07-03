@@ -310,10 +310,7 @@ def plot_kin_predictions(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10))
     Each column holds the following data:
     cam1_x cam1_y cam2_x cam2_y
     """
-    w = io.load_decoded_weights(mouse_day.mouseID, mouse_day.day)
-    X = mouse_day.get_trimmed_spks()
-    true_positions = mouse_day.get_trimmed_avg_locs()
-    pred_positions = X @ w
+    gen_scores, true_positions, pred_positions = interp.general_ridge(mouse_day)
 
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=figsize)
     trimmed_tstamps = mouse_day.get_trimmed_cal_tstamps()
@@ -393,7 +390,7 @@ if __name__ == "__main__":
     event_key = event_keys[0]  # Use first available key
     
     # Plotting Ridge Regression results
-    fig2 = plot_kin_predictions_by_model(mouse_day)
+    fig2 = plot_kin_predictions(mouse_day)
     plt.show()
 
     # Create comprehensive plot

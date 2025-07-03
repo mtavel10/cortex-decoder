@@ -382,7 +382,8 @@ class MouseDay:
         Returns a numpy array of size (n_timepoints x n_neurons)
         Represents the estimated spike probabilities across all timepoints
         """
-        return self.cal_spks[:, 32:-32].T
+        trimmed_arr = self.cal_spks[:, 32:-32].T
+        return trimmed_arr
 
     def get_trimmed_avg_locs(self):
         """
