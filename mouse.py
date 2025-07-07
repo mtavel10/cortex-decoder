@@ -405,7 +405,7 @@ class MouseDay:
 
             event_idx_list = np.where(self.cal_event_frames == frame)[0]
             # There is no event label for this frame
-            if not event_idx_list:
+            if len(event_idx_list) == 0:
                 beh_labels.append(curr_beh_label)
                 # An ongoing behavior
                 if beh_frame_count > 0:
