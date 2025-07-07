@@ -5,15 +5,15 @@ import pandas as pd
 import src.utils
 import os
 
-def load_pickle(filename):
-    with open(filename, 'rb') as file:
+def load_pickle(filepath):
+    with open(filepath, 'rb') as file:
         data = pickle.load(file)
     return data
 
 
-def save_pickle(filename,var):
-    with open(filename, "wb") as file:
-        pickle.dump(var, file)
+def save_pickle(filepath, obj):
+    with open(filepath, "wb") as file:
+        pickle.dump(obj, file)
 
 
 def get_drive(mouseID):
@@ -54,6 +54,11 @@ def load_spks(mouseID, day):
     s2p_fld = get_s2p_fld(mouseID, day)
     spks = np.load(f"{s2p_fld}/calcium/cascade_spks.npy")
     return spks
+
+def load_spk_labels(mouseID, day):
+    s2p_fld = get_s2p_fld(mouseID, day)
+    labels = np.load(f"{s2p_fld}/calcium/red_labels.npy")
+    return labels
 
 
 def load_cal_event_times(mouseID, day):
@@ -157,13 +162,38 @@ def load_cal_tstamps(mouseID, day):
     cal_tstamps = np.load(f"{s2p_fld}/tseries/calcium_timestamps.npy")
     return cal_tstamps.astype('datetime64[ns]').astype(float)
 
-def save_decoded_data(mouseID: str, day: str, weights: np.ndarray, scores: list[float], model_type="general"):
+
+def save_decoded_data(mouseID: str, day: str, scores: list[float], preds: np.ndarray, model_type="general"):
+    """ Saves decoded scores and predictions for comparison and plotting purposes """
     file_path = f"{get_drive(mouseID)}/decoded_data/{mouseID}/{day}"
     os.makedirs(file_path, mode=0o777, exist_ok=True)
-    np.save(f"{file_path}/{model_type}_weights.npy", weights)
+    np.save(f"{file_path}/{model_type}_preds.npy", preds)
     np.save(f"{file_path}/{model_type}_scores.npy", scores)
 
-def load_decoded_weights(mouseID: str, day: str, model_type="general"):
+def save_scores_by_beh(mouseID: str, day: str, scores: dict[int, np.ndarray]):
     file_path = f"{get_drive(mouseID)}/decoded_data/{mouseID}/{day}"
-    weights = np.load(f"{file_path}/{model_type}_weights.npy")
-    return weights.T
+    file_name = f"{file_path}/general_scores_by_behavior.pkl"
+    save_pickle(file_name, scores)
+
+def load_scores_by_beh(mouseID: str, day: str):
+    file_path = f"{get_drive(mouseID)}/decoded_data/{mouseID}/{day}"
+    file_name = f"{file_path}/general_scores_by_behavior.pkl"
+    scores = load_pickle(file_name)
+    return scores
+
+def load_decoded_data(mouseID: str, day: str, model_type="general"):
+    """ Loads decoded scores and predictions for comparison and plotting purposes """
+    file_path = f"{get_drive(mouseID)}/decoded_data/{mouseID}/{day}"
+    preds = np.load(f"{file_path}/{model_type}_preds.npy")
+    scores = np.load(f"{file_path}/{model_type}_scores.npy")
+    return scores, preds
+
+def save_model(mouseID: str, day: str, model_obj: any, model_type="general"):
+    file_path = f"{get_drive(mouseID)}/decoded_data/{mouseID}/{day}"
+    file_name = f"{file_path}/{model_type}_model.pkl"
+    save_pickle(file_name, model_obj)
+
+def load_model(mouseID: str, day: str, model_type="general") -> any:
+    file_path = f"{get_drive(mouseID)}/decoded_data/{mouseID}/{day}/{model_type}_model.pkl"
+    model_obj = load_pickle(file_path)
+    return model_obj

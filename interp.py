@@ -5,7 +5,7 @@ import src.utils as ut
 import math
 from mouse import MouseDay
 from typing import Optional, Tuple
-from sklearn.model_selection import StratifiedKFold, KFold
+from sklearn.model_selection import StratifiedKFold, KFold, StratifiedShuffleSplit
 from sklearn.linear_model import Ridge, RidgeCV
 from sklearn.metrics import r2_score
 import plot as myplot
@@ -15,20 +15,19 @@ def general_ridge(mouse_day: MouseDay, n_trials: int=10):
     y = mouse_day.get_trimmed_avg_locs()
     beh_per_frame = mouse_day.get_trimmed_beh_labels()
     scores = []
-    weights = []
     y_preds = []
     # Splitter object
-    splitter = StratifiedKFold(n_splits=n_trials, shuffle=True, random_state=42)
+    splitter = StratifiedShuffleSplit(n_splits=n_trials, test_size=0.3, train_size=0.7, random_state=42)
 
+    # Cross-validate to find the best alpha
+    ridge = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0], fit_intercept=True)
+    
     # splitter.split() randomly generates test/training indices for X based on a stratifier (the beh labels)
     # Loops n_splits times
     for i, (train_idcs, test_idcs) in enumerate(splitter.split(X, beh_per_frame)):
         print("Training Split: ", i)
         X_train, X_test = X[train_idcs], X[test_idcs]
         y_train, y_test = y[train_idcs], y[test_idcs]
-        
-        # Cross-validate to find the best alpha
-        ridge = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0], fit_intercept=True)
 
         # Train the model
         ridge.fit(X_train, y_train)
@@ -45,9 +44,10 @@ def general_ridge(mouse_day: MouseDay, n_trials: int=10):
     for test_idcs, pred in y_preds:
         y_pred[test_idcs] = pred
     
-    # saves the preds and scores for plotting purposes
-    # io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, model_type="general")
-    # save the ridge objects (just in case)
+    # saves the scores and predictions for plotting
+    io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type="general")
+    # saves the last training iteration just in case
+    io.save_model(mouse_day.mouseID, mouse_day.day, ridge)
 
     return scores, y, y_pred
 
@@ -64,43 +64,52 @@ def ridge_by_beh(mouse_day: MouseDay, n_trials: int=10):
     all_scores = []
 
     for label in labels.keys():
+        print(f"Training models on {labels[label]} data... ")
         beh_frames = np.where(beh_per_frame == label)
         curr_X = X[beh_frames]
         curr_y = y[beh_frames]
         scores = []
         y_preds = []
+
+        # CV to find best alpha
+        ridge = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0], fit_intercept=True)
         
         # KFold CV on the current behavior's data
         splitter = KFold(n_splits=n_trials, shuffle=True, random_state=42)
         for i, (train_idcs, test_idcs) in enumerate(splitter.split(curr_X)):
+            print("training split: ", i)
             X_train, X_test = curr_X[train_idcs], curr_X[test_idcs]
             y_train, y_test = curr_y[train_idcs], curr_y[test_idcs]
-            
-            # CV to find best alpha
-            ridge = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0], fit_intercept=False)
 
             # Train the model
             ridge.fit(X_train, y_train)
 
             # Evaluate based on R^2
-            scores.append(ridge.score(X_test, y_test))
+            trial_score = ridge.score(X_test, y_test)
+            scores.append(trial_score)
+            print(trial_score)
 
-            # Predict locations for this test fold
-            # Only predict on test data for this fold
-            y_pred_fold = ridge.predict(X_test)
-            y_preds.append((test_idcs, y_pred_fold))
+        #     # Predict locations for this test fold
+        #     # Only predict on test data for this fold
+        #     y_pred_fold = ridge.predict(X_test)
+        #     y_preds.append((test_idcs, y_pred_fold))
         
-        # Reconstruct full predictions FOR THIS BEHAVIOR MODEL
-        y_pred = np.zeros_like(y)
-        for test_idcs, pred in y_preds:
-            y_pred[test_idcs] = pred
+        # # Reconstruct full predictions (but only for timepoints of this behavior??)
+        # y_pred = np.zeros_like(y)
+        # for test_idcs, pred in y_preds:
+        #     y_pred[test_idcs] = pred
+        # print(y_pred)
+
+        # Make an overall prediction on all data using the last iteration of this behavior model
+        # Not that precise of a location prediction but pred data more for sanity check than anything
+        y_pred = ridge.predict(X)
 
         all_preds.append(y_pred)
         all_scores.append(scores)
 
-    # save scores
-    # for label, scores in zip(labels.values(), all_scores):
-    #     io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, model_type=label)
+        # save model
+        io.save_model(mouse_day.mouseID, mouse_day.day, ridge, labels[label])
+        io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type=labels[label])
 
     return all_scores, y, y_preds
 
@@ -117,8 +126,10 @@ def ridge_test_by_beh(mouse_day: MouseDay, ntrials: int=10):
     X_beh_test: dict[int, np.ndarray] = {}
     y_beh_test: dict[int, np.ndarray] = {}
 
-    X_gen = np.zeros((1, 420))
-    y_gen = np.zeros((1, 4))
+    print(X.shape)
+    print(y.shape)
+    X_gen = np.zeros((1, X.shape[1]))
+    y_gen = np.zeros((1, y.shape[1]))
     beh_per_frame_gen = []
 
     # 1: need to hold out samples of each behavior
@@ -152,10 +163,8 @@ def ridge_test_by_beh(mouse_day: MouseDay, ntrials: int=10):
 
     # 2: train a model
     scores_by_beh: dict[int, list[float]] = {}
-    preds_by_beh: dict[int, list[float]] = {}
     for label in behaviors.keys():
         scores_by_beh[label] = []
-        preds_by_beh[label] = []
 
     splitter = StratifiedKFold(n_splits=ntrials, shuffle=True, random_state=42)
     for i, (train_idcs, test_idcs) in enumerate(splitter.split(X_gen, beh_per_frame_gen)):
@@ -174,11 +183,84 @@ def ridge_test_by_beh(mouse_day: MouseDay, ntrials: int=10):
             X_test = X_beh_test[label]
             y_test = y_beh_test[label]
 
-            scores_by_beh[label].append(ridge.score(X_test, y_test)) # 10 scores per behavior (10 folds)
-            preds_by_beh[label].append(ridge.predict(X_test)) # every fold is going to have different predictions for the same testing data...
+            trial_scores = ridge.score(X_test, y_test)
+            print(f"General Model Score on {behaviors[label]} data: ", trial_scores)
+            scores_by_beh[label].append(trial_scores)# 10 scores per behavior (10 folds)
             
+    io.save_scores_by_beh(mouse_day.mouseID, mouse_day.day, scores_by_beh)
+
+    return scores_by_beh
+
+def ridge_by_cell(mouse_day: MouseDay, ntrials: int=10):
+    """
+    Running 2 ridge regressions on different feature spaces: excitatory and inhibitory interneurons. 
+    Motivation: Is it easier to predict on excitatory or inhibitory neural data?
+    """
+    cell_labels = mouse_day.cell_labels
+    data = mouse_day.get_trimmed_spks()
+
+    X_inhibitory = data[:, cell_labels]
+    X_excitatory = data[: , ~cell_labels]
+
+    # Need to train on equal feature spaces...
+    min_features = len(X_inhibitory[0])
+
+    y = mouse_day.get_trimmed_avg_locs()
+    beh_per_frame = mouse_day.get_trimmed_beh_labels()
+
+    ex_scores = []
+    ex_preds = []
+
+    in_scores = []
+    in_preds = []
     
-    return scores_by_beh, y_beh_test, preds_by_beh
+    split_data: dict[str, list[any]] = {"inhibitory": [X_inhibitory, in_scores, in_preds], "excitatory": [X_excitatory, ex_scores, ex_preds]}
+
+    for cell, cell_data in split_data.items():
+        print(f"Decoding {cell} data...")
+
+        splitter = StratifiedShuffleSplit(n_splits=ntrials, test_size=0.3, train_size=0.7, random_state=42)
+        # Cross-validate to find the best alpha
+        ridge = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0], fit_intercept=True)
+
+        X = cell_data[0]
+
+        # Need to limit the feature space for excitatory data
+        if cell == "excitatory":
+            np.random.seed(42)
+            idcs = np.random.choice(X.shape[1], min_features, replace=False)
+            X = X[:, idcs]
+        
+        y_preds = []
+        for i, (train_idcs, test_idcs) in enumerate(splitter.split(X, beh_per_frame)):
+            print("Training Split: ", i)
+            X_train, X_test = X[train_idcs], X[test_idcs]
+            y_train, y_test = y[train_idcs], y[test_idcs]
+
+            # Train the model
+            ridge.fit(X_train, y_train)
+
+            # Evaluate based on R^2
+            cell_data[1].append(ridge.score(X_test, y_test))
+
+            # Only predict on test data for this fold
+            y_pred_fold = ridge.predict(X_test)
+            y_preds.append((test_idcs, y_pred_fold))
+        
+        # Reconstruct full predictions
+        y_pred = np.zeros_like(y)
+        for test_idcs, pred in y_preds:
+            y_pred[test_idcs] = pred
+        cell_data[2] = y_pred
+
+        print("Scores: ", cell_data[1])
+        
+        # saves the scores and predictions for plotting
+        io.save_decoded_data(mouse_day.mouseID, mouse_day.day, cell_data[1], cell_data[2], model_type=cell)
+        # saves the last training iteration just in case
+        io.save_model(mouse_day.mouseID, mouse_day.day, ridge, model_type=cell)
+
+    return in_scores, in_preds, ex_scores, ex_preds
 
       
 def latency_check(mouse_day: MouseDay):
@@ -203,7 +285,9 @@ def dimensions_check(mouse_day: MouseDay):
     print("Num labels: ", len(test_labels))
 
 if __name__ == "__main__":
-    test_mouse = MouseDay("mouse25", "20240425")
+    mouseID = "mouse25"
+    day = "20240425"
+    test_mouse = MouseDay(mouseID, day)
     # print("number of caltstamps: ", test_mouse.cal_ntimestamps)
     # print("number of cal frames: ", test_mouse.cal_nframes)
     # print("caltstamps (full): ", test_mouse.cal_tstamps)
@@ -221,8 +305,10 @@ if __name__ == "__main__":
 
     # print(avg_weights)
     # print(scores)
-    # all_weights, all_scores, y, y_preds = ridge_by_beh(test_mouse)
-    # myplot.plot_r2_scores(test_mouse.BEHAVIOR_LABELS, beh_scores, gen_scores)
+
     
-    scores_by_beh, y_beh_test, preds_by_beh = ridge_test_by_beh(test_mouse)
-    print(scores_by_beh)
+    # all_scores, y, y_preds = ridge_by_beh(test_mouse)
+        
+    # scores_by_beh = ridge_test_by_beh(test_mouse)
+    
+    ridge_by_cell(test_mouse)

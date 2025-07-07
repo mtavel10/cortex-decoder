@@ -82,6 +82,7 @@ class MouseDay:
         self._event_labels = io.load_event_labels(mouseID, day)
 
         self._cal_spks = io.load_spks(mouseID, day)
+        self._cell_labels = io.load_spk_labels(mouseID, day)
 
         self._kin_dfs = {}
         for key in self.seg_keys:
@@ -93,17 +94,6 @@ class MouseDay:
             self._kin_mats[key] = (self.create_kinematics_matrix(df1), self.create_kinematics_matrix(df2))
         
         self._interpolated_kin_avgs = self.interpolate_all("avg")
-
-    # # Getter methods for the data to be accessed outside of the class
-    # @property
-    # def cal_tseries(self) -> np.ndarray:
-    #     """Get the calcium time series data."""
-    #     return self._cal_tseries
-    
-    # @property
-    # def kin_tseries(self) -> np.ndarray:
-    #     """Get the kinematic time series data."""
-    #     return self._kin_tseries
 
     @property
     def cal_tstamps(self) -> np.ndarray:
@@ -137,6 +127,11 @@ class MouseDay:
     def cal_spks(self) -> np.ndarray:
         """Get the calibration spikes data."""
         return self._cal_spks
+    
+    @property
+    def cell_labels(self) -> np.ndarray:
+        """ True for inhibitory, False for excitatory """
+        return self._cell_labels
     
     @property
     def kin_dfs(self) -> dict [str : tuple[pd.DataFrame, pd.DataFrame]]:
