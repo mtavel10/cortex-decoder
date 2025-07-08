@@ -10,6 +10,8 @@ from sklearn.linear_model import Ridge, RidgeCV
 from sklearn.metrics import r2_score
 import plot as myplot
 
+TEST_SIZE = .30 # 70/30 split duhhh
+
 def general_ridge(mouse_day: MouseDay, n_trials: int=10):
     X = mouse_day.get_trimmed_spks()
     y = mouse_day.get_trimmed_avg_locs()
@@ -132,6 +134,9 @@ def ridge_test_by_beh(mouse_day: MouseDay, ntrials: int=10):
     y_gen = np.zeros((1, y.shape[1]))
     beh_per_frame_gen = []
 
+    # need to limit the size of testing samples later on
+    test_sizes = []
+
     # 1: need to hold out samples of each behavior
     behaviors = mouse_day.BEHAVIOR_LABELS
     for label in behaviors.keys():
@@ -150,6 +155,8 @@ def ridge_test_by_beh(mouse_day: MouseDay, ntrials: int=10):
         holdout_X, holdout_y = beh_X[:holdout_idx], beh_y[:holdout_idx]
         using_X, using_y = beh_X[holdout_idx:], beh_y[holdout_idx:]
 
+        test_sizes.append(len(holdout_X))
+
         X_beh_test[label] = holdout_X
         y_beh_test[label] = holdout_y
         
@@ -160,6 +167,10 @@ def ridge_test_by_beh(mouse_day: MouseDay, ntrials: int=10):
 
     X_gen = X_gen[1:]
     y_gen = y_gen[1:]
+    
+    min_test_size = 157
+    print(test_sizes)
+    print(min_test_size)
 
     # 2: train a model
     scores_by_beh: dict[int, list[float]] = {}
@@ -182,6 +193,12 @@ def ridge_test_by_beh(mouse_day: MouseDay, ntrials: int=10):
         for label in X_beh_test.keys():
             X_test = X_beh_test[label]
             y_test = y_beh_test[label]
+
+            # make sure all the test data samples are the same across behaviors
+            indices = np.arange(len(X_test))
+            np.random.shuffle(indices)
+            X_test, y_test = X_test[indices], y_test[indices]
+            X_test, y_test = X_test[:min_test_size], y_test[:min_test_size]
 
             trial_scores = ridge.score(X_test, y_test)
             print(f"General Model Score on {behaviors[label]} data: ", trial_scores)
@@ -219,7 +236,7 @@ def ridge_by_cell(mouse_day: MouseDay, ntrials: int=10):
     for cell, cell_data in split_data.items():
         print(f"Decoding {cell} data...")
 
-        splitter = StratifiedShuffleSplit(n_splits=ntrials, test_size=0.3, train_size=0.7, random_state=42)
+        splitter = StratifiedShuffleSplit(n_splits=ntrials, test_size=TEST_SIZE, train_size=(1-TEST_SIZE), random_state=42)
         # Cross-validate to find the best alpha
         ridge = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0], fit_intercept=True)
 
@@ -262,6 +279,50 @@ def ridge_by_cell(mouse_day: MouseDay, ntrials: int=10):
 
     return in_scores, in_preds, ex_scores, ex_preds
 
+def decode_learned_beh(mouse_day: MouseDay, beh_class: str, ntrials: int=10):
+    spikes = mouse_day.get_trimmed_spks()
+    locs = mouse_day.get_trimmed_avg_locs() 
+    beh_per_frame = mouse_day.get_trimmed_beh_labels()
+    
+    # separate out data by behavior class
+    if beh_class == "learned":
+        # decode based on reach, carry, and grasp data
+        learned_beh_frames = np.where((beh_per_frame >= 0) & (beh_per_frame <= 2))
+    else:
+        # decode based on "natural" behaviors: non-movement, fidget, eating, and grooming
+        learned_beh_frames = np.where((beh_per_frame >= 3) & (beh_per_frame <= 6))
+    X = spikes[learned_beh_frames]
+    y = locs[learned_beh_frames]
+    beh_per_frame = beh_per_frame[learned_beh_frames]
+
+    ridge = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0], fit_intercept=True)
+    splitter = StratifiedShuffleSplit(n_splits=ntrials, test_size=.30, train_size = 1-.3)
+
+    scores = []
+    y_preds = []
+    for i, (train_idcs, test_idcs) in enumerate(splitter.split(X, beh_per_frame)):
+        print("Training split: ", i)
+        X_train, X_test = X[train_idcs], X[test_idcs]
+        y_train, y_test = y[train_idcs], y[test_idcs]
+
+        ridge.fit(X_train, y_train)
+        scores.append(ridge.score(X_test, y_test))
+
+        y_preds_fold = ridge.predict(X_test)
+        y_preds.append((test_idcs, y_preds_fold))
+    
+     # Reconstruct full predictions
+    y_pred = np.zeros_like(y)
+    for test_idcs, pred in y_preds:
+        y_pred[test_idcs] = pred
+    
+    io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type=f"{beh_class}_beh_class")
+    io.save_model(mouse_day.mouseID, mouse_day.day, ridge, model_type=f"{beh_class}_beh_class")
+
+    return scores, y_pred
+
+def decode_natural_beh(mouse_day: MouseDay, ntrials: int=10):
+    return
       
 def latency_check(mouse_day: MouseDay):
     print("# of timestamps (calcium): ", test_mouse.cal_ntimestamps)
@@ -311,4 +372,10 @@ if __name__ == "__main__":
         
     # scores_by_beh = ridge_test_by_beh(test_mouse)
     
-    ridge_by_cell(test_mouse)
+    # ridge_by_cell(test_mouse)
+
+    scores, preds = decode_learned_beh(test_mouse, "learned")
+    print("Average learned score: ", np.mean(scores))
+
+    scores1, preds1 = decode_learned_beh(test_mouse, "natural")
+    print("Average natural score: ", np.mean(scores1))

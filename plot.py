@@ -5,7 +5,7 @@ from matplotlib.patches import Rectangle
 import seaborn as sns
 from typing import List, Dict, Tuple
 from mouse import MouseDay
-import interp
+import decode as decode
 import src.IO as io
 
 # for now, only working with the first 4464 frames for Mouse25 20240425
@@ -480,11 +480,11 @@ if __name__ == "__main__":
     # plt.show()
 
     # Plot general model performance on each behavior
-    # fig5 = plot_general_performance_by_beh(mouse_day)
-    # plt.show()
-
-    fig6 = plot_cell_performance(mouse_day)
+    fig5 = plot_general_performance_by_beh(mouse_day)
     plt.show()
+
+    # fig6 = plot_cell_performance(mouse_day)
+   #  plt.show()
 
     # Create comprehensive plot of mouseday data
     # fig1 = plot_mouseday_data(mouse_day, event_key)
