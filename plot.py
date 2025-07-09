@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-from matplotlib.patches import Rectangle
+ from matplotlib.patches import Patch
 import seaborn as sns
 from typing import List, Dict, Tuple
 from mouse import MouseDay
@@ -460,6 +460,56 @@ def plot_cell_performance(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10)
         height = bar.get_height()
         ax.text(bar.get_x() + bar.get_width()/2., height + std + 0.02,
                 f'{mean:.3f}±{std:.3f}', ha='center', va='bottom', fontsize=9)
+    
+    plt.tight_layout()
+    return fig
+
+def plot_beh_class_performance(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10)):
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
+
+    learned_scores, p = io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type="learned_class")
+    natural_scores, p = io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type="natural_class")
+    learned_xtested_scores, p = io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type="learned_x_natural")
+    natural_xtested_scores, p = io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type="natural_x_learned")
+
+    means = [np.mean(learned_scores), np.mean(learned_xtested_scores), np.mean(natural_scores), np.mean(natural_xtested_scores)]
+    stds = [np.std(learned_scores), np.std(learned_xtested_scores), np.std(natural_scores), np.std(natural_xtested_scores)]
+
+    colors = ['skyblue', 'orange', 'lightgreen', 'orange']  # cross-tested bars are orange
+    labels = ["Learned Behavior Model", "Learned Behavior Model (Cross-Tested)",
+              "Natural Behavior Model", "Natural Behavior Model (Cross-Tested)"]
+
+    # Create bar plot with error bars
+    bars = ax.bar(labels, means, yerr=stds, capsize=5, alpha=0.7, 
+                  color=colors)
+
+    # Create legend
+    legend_elements = [
+        Patch(facecolor='skyblue', alpha=0.7, label='"Learned" Behavior Class: Reach, Carry, Grasp'),
+        Patch(facecolor='lightgreen', alpha=0.7, label='"Natural" Behavior Class: Non-movement, Fidget, Eat, Groom'),
+        Patch(facecolor='orange', alpha=0.7, label='Cross-tested (train class ≠ test class)')
+    ]
+    ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.0, 1.0))
+    
+    # Customize the plot
+    ax.set_ylim(-1, 1)
+    ax.set_ylabel("R² Score")
+    ax.set_xlabel("Model")
+    ax.set_title("Behavior Class Model Performance: Learned vs. Natural, Cross-Tested")
+    ax.grid(axis='y', alpha=0.3)
+    
+    # Rotate x-axis labels
+    plt.xticks(rotation=45, ha='right')
+    
+    # Add value labels on top of bars
+    for bar, mean, std in zip(bars, means, stds):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height + std + 0.02,
+                f'{mean:.3f}±{std:.3f}', ha='center', va='bottom', fontsize=9)
+    
+    plt.tight_layout()
+    return fig
+
 
 if __name__ == "__main__":
 
@@ -480,7 +530,10 @@ if __name__ == "__main__":
     # plt.show()
 
     # Plot general model performance on each behavior
-    fig5 = plot_general_performance_by_beh(mouse_day)
+    # fig5 = plot_general_performance_by_beh(mouse_day)
+    # plt.show()
+
+    fig6 = plot_beh_class_performance(mouse_day)
     plt.show()
 
     # fig6 = plot_cell_performance(mouse_day)
