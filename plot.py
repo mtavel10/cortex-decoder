@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
- from matplotlib.patches import Patch
+from matplotlib.patches import Patch
 import seaborn as sns
 from typing import List, Dict, Tuple
 from mouse import MouseDay
@@ -510,6 +510,74 @@ def plot_beh_class_performance(mouse_day: MouseDay, figsize: Tuple[int, int]=(16
     plt.tight_layout()
     return fig
 
+def plot_cross_beh_performance(mouse_day: MouseDay, behaviors: list[str], figsize: Tuple[int, int]=(16, 10)):
+    """
+    Plots each individual behavior, cross-tested on a model trained on the opposite behavior "class" 
+    (i.e. a model trained on "natural" beheavior data was cross tested on each individual "learned" behavior)
+    """
+
+    class_colors = {"learned": "lightsteelblue", "natural": "rosybrown"}
+
+    scores_list = []
+    num_natural = 0
+    num_learned = 0
+    for beh in behaviors:
+        # determine the "cross class": for this behavior
+        if decode.BEH_CLASSES[beh][0] in decode.BEH_CLASSES["natural"]:
+            cross_class = "learned"
+            num_natural += 1
+        else:
+            cross_class = "natural"
+            num_learned += 1
+        scores, preds = io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type=f"{cross_class}_x_{beh}")
+        scores_list.append(scores)
+    colors = [class_colors["learned"]] * num_learned + [class_colors["natural"]] * num_natural
+    
+    # Calculate means and standard deviations
+    means = [np.mean(scores) for scores in scores_list]
+    stds = [np.std(scores) for scores in scores_list]
+    
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    # Set up x positions
+    x_pos = np.arange(len(behaviors))
+    
+    # Create bars
+    bars = ax.bar(x_pos, means, yerr=stds, capsize=5, 
+                  color=colors, alpha=0.7, edgecolor='black', linewidth=1)
+    
+     # Create legend
+    legend_elements = [
+        Patch(facecolor='lightsteelblue', alpha=0.7, label='"Natural" Model Performance on Learned Behaviors'),
+        Patch(facecolor='rosybrown', alpha=0.7, label='"Learned" Model Performance on Natural Behaviors'),
+    ]
+    ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.0, 1.0))
+    
+    # Customize the plot
+    ax.set_xlabel('Behavior Type', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Average Score', fontsize=12, fontweight='bold')
+    ax.set_title("Cross-Tested Behavior Model Performance", fontsize=14, fontweight='bold')
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(behaviors, rotation=45, ha='right')
+    # ax.set_ylim(-15, 0.25)
+    
+    # Add value labels on bars if requested
+    for i, (bar, mean, std) in enumerate(zip(bars, means, stds)):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height + std + 0.01,
+                f'{mean:.3f}±{std:.3f}', ha='center', va='bottom', fontsize=10)
+    
+    # Add grid for better readability
+    ax.grid(axis='y', alpha=0.3)
+    ax.set_axisbelow(True)
+    
+    # Adjust layout to prevent label cutoff
+    plt.tight_layout()
+
+    return fig
+
+
 
 if __name__ == "__main__":
 
@@ -533,11 +601,14 @@ if __name__ == "__main__":
     # fig5 = plot_general_performance_by_beh(mouse_day)
     # plt.show()
 
-    fig6 = plot_beh_class_performance(mouse_day)
-    plt.show()
+    # fig6 = plot_beh_class_performance(mouse_day)
+    # plt.show()
 
     # fig6 = plot_cell_performance(mouse_day)
-   #  plt.show()
+    # plt.show()
+
+    fig7 = plot_cross_beh_performance(mouse_day, ["reach", "grasp", "carry", "non_movement", "fidget", "eating", "grooming"])
+    plt.show()
 
     # Create comprehensive plot of mouseday data
     # fig1 = plot_mouseday_data(mouse_day, event_key)

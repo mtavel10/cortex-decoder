@@ -11,7 +11,7 @@ from sklearn.metrics import r2_score
 import plot as myplot
 
 TEST_SIZE = .30 # 70/30 split duhhh
-BEH_CLASSES = {"learned": [0, 1, 2], "natural": [3, 4, 5, 6]}
+BEH_CLASSES = {"learned": [0, 1, 2], "natural": [3, 4, 5, 6], "reach": [0], "grasp": [1], "carry": [2], "non_movement": [3], "fidget": [4], "eating": [5], "grooming": [6]}
 
 def general_ridge(mouse_day: MouseDay, n_trials: int=10):
     X = mouse_day.get_trimmed_spks()
@@ -439,10 +439,26 @@ if __name__ == "__main__":
     # scores1, preds1 = decode_by_beh_class(test_mouse, "natural")
     # print("Average natural score: ", np.mean(scores1))
 
-    scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=BEH_CLASSES["natural"])
-    print("Learned behavior model, tested on natural behaviors score: ", np.mean(scores))
+    # scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=BEH_CLASSES["natural"])
+    # print("Learned behavior model, tested on natural behaviors score: ", np.mean(scores))
 
-    scores1, preds1 = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class=BEH_CLASSES["learned"])
-    print("Natural behavior model, tested on learned behaviors score: ", np.mean(scores1))
+    # scores1, preds1 = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class=BEH_CLASSES["learned"])
+    # print("Natural behavior model, tested on learned behaviors score: ", np.mean(scores1))
 
+    reach_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class=[0])
+    grasp_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class=[1])
+    carry_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class=[2])
 
+    print("reach cross: ", reach_cross_scores)
+    print("grasp cross: ", grasp_cross_scores)
+    print("carry cross: ", carry_cross_scores)
+
+    non_movement_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=[3])
+    fidget_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=[4])
+    eating_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=[5])
+    grooming_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=[6])
+
+    print("non_movement cross: ", non_movement_cross_scores)
+    print("fidget cross: ", fidget_cross_scores)
+    print("eating cross: ", eating_cross_scores)
+    print("grooming cross: ", grooming_cross_scores)
