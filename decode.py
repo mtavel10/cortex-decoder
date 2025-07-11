@@ -340,8 +340,7 @@ def decode_cross_beh_class(mouse_day: MouseDay, train_class: list[int], test_cla
     X_test = spikes[testing_beh_frames]
     y_test = locs[testing_beh_frames]
 
-    # should limit the test size if there's less training samples than test samples
-    max_test_size = min(len(training_beh_frames), len(testing_beh_frames))
+    # max_test_size = 12 # limiting it to the smallest number of datapoints across behaviors (this is so not dynamic i need to fix it before doing more day analysis)
 
     # to sort training data by behavior group to ensure equal distribution
     beh_per_frame = beh_per_frame[training_beh_frames]
@@ -359,22 +358,37 @@ def decode_cross_beh_class(mouse_day: MouseDay, train_class: list[int], test_cla
         ridge.fit(X_train, y_train)
 
         # make sure all the test data samples are the same across behaviors
-        indices = np.arange(len(X_test))
-        np.random.seed(42)
-        np.random.shuffle(indices)
-        X_test, y_test = X_test[indices], y_test[indices]
-        X_test, y_test = X_test[:max_test_size], y_test[:max_test_size]
+        test_indices = np.arange(len(X_test))
+        # np.random.seed(42)
+        # should these testing indices be broken up per fold?
+        np.random.shuffle(test_indices)
+        print("testing these indicies: ", test_indices)
+        X_test, y_test = X_test[test_indices], y_test[test_indices]
+        # X_test, y_test = X_test[:max_test_size], y_test[:max_test_size]
         
         scores.append(ridge.score(X_test, y_test))
+        
+        y_preds_fold = ridge.predict(X_test)
+        y_preds.append((test_indices, y_preds_fold))
+    
+    # reconstruct all predictions 
+    y_pred = np.zeros_like(y_test)
+    for idcs, preds in y_preds:
+        print(idcs.shape)
+        print(preds.shape)
+        print(type(idcs))
+        print(type(idcs[0]))
+        print(idcs)
+        print(preds)
+        y_pred[idcs] = preds
+    # put these predictions into a matrix of the same size as the originals, zero out where the behaviors are zero
+    y_pred_full = np.zeros_like(locs)
+    for frame in range(0, len(y_pred_full)):
+        rah = 0
 
-        y_preds.append(ridge.predict(X_test))
-    
-    
-    # average all the predictions in the end... making multiple predictions on the same indicies    
-    y_pred = np.average(y_preds)
-    
     # buggy
     if (save_res):
+        print("here")
         train_class_type = [key for key, value in BEH_CLASSES.items() if value==train_class][0]
         test_class_type = [key for key, value in BEH_CLASSES.items() if value==test_class][0]
         io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type=f"{train_class_type}_x_{test_class_type}")
@@ -446,19 +460,19 @@ if __name__ == "__main__":
     # print("Natural behavior model, tested on learned behaviors score: ", np.mean(scores1))
 
     reach_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class=[0])
-    grasp_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class=[1])
-    carry_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class=[2])
+    # grasp_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class=[1])
+    # carry_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class=[2])
 
-    print("reach cross: ", reach_cross_scores)
-    print("grasp cross: ", grasp_cross_scores)
-    print("carry cross: ", carry_cross_scores)
+    # print("reach cross: ", reach_cross_scores)
+    # print("grasp cross: ", grasp_cross_scores)
+    # print("carry cross: ", carry_cross_scores)
 
-    non_movement_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=[3])
-    fidget_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=[4])
-    eating_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=[5])
-    grooming_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=[6])
+    # non_movement_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=[3])
+    # fidget_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=[4])
+    # eating_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=[5])
+    # grooming_cross_scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=[6])
 
-    print("non_movement cross: ", non_movement_cross_scores)
-    print("fidget cross: ", fidget_cross_scores)
-    print("eating cross: ", eating_cross_scores)
-    print("grooming cross: ", grooming_cross_scores)
+    # print("non_movement cross: ", non_movement_cross_scores)
+    # print("fidget cross: ", fidget_cross_scores)
+    # print("eating cross: ", eating_cross_scores)
+    # print("grooming cross: ", grooming_cross_scores)

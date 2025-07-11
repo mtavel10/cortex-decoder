@@ -320,13 +320,13 @@ def plot_kin_predictions(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10))
     return fig
 
 def plot_kin_predictions_by_model(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10)):
-    VIEWS = 4
+    KIN_DIMS = 4
     true_positions = mouse_day.get_trimmed_avg_locs()
     trimmed_tstamps = mouse_day.get_trimmed_cal_tstamps()
     model_types = list(mouse_day.BEHAVIOR_LABELS.values()) + ['general']
     figs = []
 
-    for v in range(0, VIEWS):
+    for v in range(0, KIN_DIMS):
         print(v)
         fig, axes = plt.subplot_mosaic([['reach', 'grasp', 'carry'],
                                         ['non_movement_or_kept_jumping', 'fidget', 'eating'],
@@ -360,6 +360,46 @@ def plot_kin_predictions_by_model(mouse_day: MouseDay, figsize: Tuple[int, int]=
         figs.append(fig)
 
     return figs
+
+def plot_predictions(mouse_day: MouseDay, train_type: str, test_type: str | None, figsize: Tuple[int, int]=(16, 10)):
+    """
+    Plots the 4 average kinematic predictions against the true locations (camera 1 x/y, camera 2 x/y). 
+    Parameters
+        mouse_day
+        train_type: str
+            data category that the model was trained on ("general", "inhibitory", "excitatory", "reach", "fidget", etc)
+        test_type: str
+            data category that the model was tested on (None if we aren't cross-testing)
+            If None, the training data type is the same as the testing data type
+    """
+    KIN_DIMS = ["Cam1 X", "Cam1 Y", "Cam2 X", "Cam2 Y"]
+    true_positions = mouse_day.get_trimmed_avg_locs()
+    trimmed_tstamps = mouse_day.get_trimmed_cal_tstamps()
+    figs = []
+
+    for d, dim in enumerate(KIN_DIMS):
+        # get it to work for one train-test type, then expand to plot multiple model/test combos at once
+        fig, axes = plt.subplots(figsize=figsize)
+        
+        mode = ""
+        if (test_type):
+            mode = f"{train_type}_x_{test_type}"
+        else: # if test_type is None, then
+            mode = f"{train_type}"
+
+        sc, pred_positions = io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type=mode)
+        print(pred_positions.shape)
+        print(pred_positions)
+        axes.plot(trimmed_tstamps, true_positions[:, d], 'b-', label="True", linewidth=1.5)
+        axes.plot(trimmed_tstamps, pred_positions[:, d], 'r-', label="Predicted", linewidth=1.5, alpha=0.5)
+        axes.set_title(f"{train_type} Model's {dim} Predictions on {test_type} data")
+        axes.set_xlabel(f"{dim} Coordinates")
+        axes.set_ylabel(f"Unix Time (ns)")
+        figs.append(fig)
+    
+    plt.tight_layout()
+
+    return 
 
 
 def plot_model_performance(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10)):
@@ -607,7 +647,10 @@ if __name__ == "__main__":
     # fig6 = plot_cell_performance(mouse_day)
     # plt.show()
 
-    fig7 = plot_cross_beh_performance(mouse_day, ["reach", "grasp", "carry", "non_movement", "fidget", "eating", "grooming"])
+    # fig7 = plot_cross_beh_performance(mouse_day, ["reach", "grasp", "carry", "non_movement", "fidget", "eating", "grooming"])
+    # plt.show()
+
+    fig8 = plot_predictions(mouse_day, train_type="learned", test_type="natural")
     plt.show()
 
     # Create comprehensive plot of mouseday data
