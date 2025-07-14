@@ -361,7 +361,7 @@ def plot_kin_predictions_by_model(mouse_day: MouseDay, figsize: Tuple[int, int]=
 
     return figs
 
-def plot_predictions(mouse_day: MouseDay, train_type: str, test_type: str | None, figsize: Tuple[int, int]=(16, 10)):
+def plot_predictions(mouse_day: MouseDay, train_type: str, test_type: str=None, figsize: Tuple[int, int]=(16, 10)):
     """
     Plots the 4 average kinematic predictions against the true locations (camera 1 x/y, camera 2 x/y). 
     Parameters
@@ -382,17 +382,25 @@ def plot_predictions(mouse_day: MouseDay, train_type: str, test_type: str | None
         fig, axes = plt.subplots(figsize=figsize)
         
         mode = ""
-        if (test_type):
-            mode = f"{train_type}_x_{test_type}"
-        else: # if test_type is None, then
+        line_type = ""
+        test_data = ""
+        if (test_type is None): # default: evaluating model performance on its own data
             mode = f"{train_type}"
+            test_data = train_type
+            line_type = "r-"
+            print("YAY")
+        else: # valuating model performance on another set of data
+            mode = f"{train_type}_x_{test_type}"
+            test_data = test_type
+            line_type = "ro" # behavior predictions are erratic
+            print("cross")
+
+        print(mode)
 
         sc, pred_positions = io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type=mode)
-        print(pred_positions.shape)
-        print(pred_positions)
         axes.plot(trimmed_tstamps, true_positions[:, d], 'b-', label="True", linewidth=1.5)
-        axes.plot(trimmed_tstamps, pred_positions[:, d], 'r-', label="Predicted", linewidth=1.5, alpha=0.5)
-        axes.set_title(f"{train_type} Model's {dim} Predictions on {test_type} data")
+        axes.plot(trimmed_tstamps, pred_positions[:, d], line_type, label="Predicted", linewidth=1.5, alpha=0.5)
+        axes.set_title(f"{train_type} Model's {dim} Predictions on {test_data} data")
         axes.set_xlabel(f"{dim} Coordinates")
         axes.set_ylabel(f"Unix Time (ns)")
         figs.append(fig)
@@ -602,7 +610,7 @@ def plot_cross_beh_performance(mouse_day: MouseDay, behaviors: list[str], figsiz
     ax.set_xticklabels(behaviors, rotation=45, ha='right')
     # ax.set_ylim(-15, 0.25)
     
-    # Add value labels on bars if requested
+    # Add value labels on bars
     for i, (bar, mean, std) in enumerate(zip(bars, means, stds)):
         height = bar.get_height()
         ax.text(bar.get_x() + bar.get_width()/2., height + std + 0.01,
@@ -617,7 +625,56 @@ def plot_cross_beh_performance(mouse_day: MouseDay, behaviors: list[str], figsiz
 
     return fig
 
+def plot_performance(mouse_day: MouseDay, modes: list[Tuple[str, str|None]], mode_type: str, figsize: Tuple[int, int]=(16, 10)):
+    """
+    Plots performance of different models dynamically based on the train type and test type (if test type is None, then the training data was the same type as the testing data)
+    Parameters
+        modes : List[Tuple[str | None]]
+    
+    """
 
+    scores_list = []
+    model_labels = []
+    for mode in modes:
+        if mode[1] == None: # default: training data class is the same as testing data class
+            scores_list.append(io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type=mode[0])[0])
+            model_labels.append(f"{mode[0]} x {mode[0]}")
+        else:
+            scores_list.append(io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type=f"{mode[0]}_x_{mode[1]}")[0])
+            model_labels.append(f"{mode[0]} x {mode[1]}")
+    
+    # Calculate means and standard deviations
+    means = [np.mean(scores) for scores in scores_list]
+    stds = [np.std(scores) for scores in scores_list]
+
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
+
+    colors = ["skyblue"] # go back and customize to work dynamically depending on the type of train/test
+    x_pos = np.arange(len(modes))
+     # Create bars
+    bars = ax.bar(x_pos, means, yerr=stds, capsize=5, 
+                  color=colors, alpha=0.7, edgecolor='black', linewidth=1)
+    
+    # Customize the plot
+    ax.set_xlabel('Mode (train x test)', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Average Score', fontsize=12, fontweight='bold')
+    ax.set_title(f"Behavior Model Performance - {mode_type}", fontsize=14, fontweight='bold')
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(model_labels, rotation=45, ha='right')
+
+     # Add value labels on bars
+    for i, (bar, mean, std) in enumerate(zip(bars, means, stds)):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height + std + 0.01,
+                f'{mean:.3f}±{std:.3f}', ha='center', va='bottom', fontsize=10)
+    
+    # Add grid for better readability
+    ax.grid(axis='y', alpha=0.3)
+    ax.set_axisbelow(True)
+    
+    
+    plt.tight_layout()
+    return fig
 
 if __name__ == "__main__":
 
@@ -637,7 +694,7 @@ if __name__ == "__main__":
     # figs4 = plot_kin_predictions_by_model(mouse_day)
     # plt.show()
 
-    # Plot general model performance on each behavior
+    # # Plot general model performance on each behavior
     # fig5 = plot_general_performance_by_beh(mouse_day)
     # plt.show()
 
@@ -650,8 +707,16 @@ if __name__ == "__main__":
     # fig7 = plot_cross_beh_performance(mouse_day, ["reach", "grasp", "carry", "non_movement", "fidget", "eating", "grooming"])
     # plt.show()
 
-    fig8 = plot_predictions(mouse_day, train_type="learned", test_type="natural")
+    # fig8 = plot_predictions(mouse_day, train_type="natural", test_type="grasp")
+    # plt.show()
+
+    CROSS_CLASS_MODE = [("natural", "reach"), ("natural", "grasp"), ("natural", "carry"), ("learned", "non_movement"), ("learned", "fidget"), ("learned", "eating"), ("learned", "grooming")]
+    IN_CLASS_MODE = [("learned", "reach"), ("learned", "grasp"), ("learned", "carry"), ("natural", "non_movement"), ("natural", "fidget"), ("natural", "eating"), ("natural", "grooming")]
+
+    fig9 = plot_performance(mouse_day, CROSS_CLASS_MODE, "Cross-class Testing")
+    fig10 = plot_performance(mouse_day, IN_CLASS_MODE, "In-Class Testing")
     plt.show()
+
 
     # Create comprehensive plot of mouseday data
     # fig1 = plot_mouseday_data(mouse_day, event_key)
