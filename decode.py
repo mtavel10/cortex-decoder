@@ -6,9 +6,10 @@ import math
 from mouse import MouseDay
 from typing import Optional, Tuple
 from sklearn.model_selection import StratifiedKFold, KFold, StratifiedShuffleSplit
-from sklearn.linear_model import Ridge, RidgeCV
+from sklearn.linear_model import Ridge, RidgeCV, LinearRegression
 from sklearn.metrics import r2_score
 import plot as myplot
+import matplotlib.pyplot as plt
 
 TEST_SIZE = .30 # 70/30 split duhhh
 
@@ -335,17 +336,15 @@ def decode_cross_beh_class(mouse_day: MouseDay, train_class: list[int], test_cla
     # separate out data by behavior class
     # Problem: For decoding behaviors with a model trained on their own behavior class, wouldn't there be a bias towards behaviors with more samples?
     # Should each training dataset be segmented into representative sample-sizes?
+    # # yes: do "covariate balancing"
 
     training_beh_frames = np.where(np.isin(beh_per_frame, train_class))[0]
     X = spikes[training_beh_frames]
     y = locs[training_beh_frames]
 
     testing_beh_frames = np.where(np.isin(beh_per_frame, test_class))[0]
-    print("test class: ", test_class)
-    print(testing_beh_frames)
     X_test = spikes[testing_beh_frames]
     y_test = locs[testing_beh_frames]
-    print("test size: ", len(X_test))
 
 
     min_test_size = 100000000000000000000
@@ -357,16 +356,16 @@ def decode_cross_beh_class(mouse_day: MouseDay, train_class: list[int], test_cla
         classes = train_class
     for beh in classes:
         num_beh_frames = np.sum(beh == beh_per_frame)
-        print(f"Number of beh frames for {beh}th behavior: ", num_beh_frames)
         if num_beh_frames < min_test_size:
             min_test_size = num_beh_frames
-    print("min test size: ", min_test_size)
 
     # to sort training data by behavior group to ensure equal distribution
     training_bpf = beh_per_frame[training_beh_frames]
     
     ridge = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0], fit_intercept=True)
     splitter = StratifiedShuffleSplit(n_splits=ntrials, test_size=TEST_SIZE, train_size = 1-TEST_SIZE)
+
+    np.random.seed(42)
 
     scores = []
     for i, (train_idcs, test_idcs) in enumerate(splitter.split(X, training_bpf)):
@@ -376,15 +375,16 @@ def decode_cross_beh_class(mouse_day: MouseDay, train_class: list[int], test_cla
 
         ridge.fit(X_train, y_train)
 
-        # make sure all the test data samples are the same across behaviors
+        # 10 shuffles/tests on the tested behavior/behavior class. sample size limited to the smallest behavior class sample size
         test_indices = np.arange(len(X_test))
-        # should these testing indices be broken up per fold?
-        np.random.seed(42)
         np.random.shuffle(test_indices)
-        # print("testing these indicies: ", test_indices)
+        print("test indicies: ", test_indices)
         X_test_fold, y_test_fold = X_test[test_indices], y_test[test_indices]
         X_test_fold, y_test_fold = X_test[:min_test_size], y_test[:min_test_size]
         
+        # fig, ax = plt.subplots(nrows=1, ncols=1)
+        # ax.plot(y_test_fold, label="y_test_fold")
+        # ax.plot(y_train, label="y_train")
         scores.append(ridge.score(X_test_fold, y_test_fold))
         
     # make predictions on cross-testing class - not robust, since using the most recent ridge object, just for sanity check
@@ -404,6 +404,62 @@ def decode_cross_beh_class(mouse_day: MouseDay, train_class: list[int], test_cla
         io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred_full, model_type=f"{train_class_type}_x_{test_class_type}")
 
     return scores, y_pred_full
+
+def simple_decode_by_class(mouse_day: MouseDay, train_class: list[int], test_class: list[int], mode: str, save_res=True, ntrials: int=10):
+    """
+    Wtf is going on with these R^2 scores
+    """
+    
+    behavior_labels: dict[int, str] = mouse_day.BEHAVIOR_LABELS
+    spikes: np.ndarray = mouse_day.get_trimmed_spks()
+    locs: np.ndarray = mouse_day.get_trimmed_avg_locs() 
+    beh_per_frame:np.ndarray = mouse_day.get_trimmed_beh_labels()
+
+    # balance the covariates in the training class
+    min_samples = 1000000000000000000000
+    train_sample_sizes = []
+    samples_by_beh = []
+    for i, train_beh in enumerate(train_class):
+        num_beh_spikes = np.sum(beh_per_frame == train_beh)
+        
+        if min_samples >= num_beh_spikes:
+            min_samples = num_beh_spikes
+        
+        samples_by_beh.append(spikes[np.where(beh_per_frame == train_beh)])
+        train_sample_sizes.append(num_beh_spikes)
+
+    X_train = np.zeros((1, spikes.shape[1]))
+    np.random.seed(42)
+    for i, train_beh in enumerate(train_class):
+        idcs = np.arange(0, int(train_sample_sizes[i]))
+        np.random.shuffle(idcs)
+        new_train_samples = samples_by_beh[i][idcs]
+        new_train_samples = new_train_samples[:min_samples]
+
+        print(X_train.shape)
+        print(new_train_samples.shape)
+        X_train = np.vstack((X_train, new_train_samples))
+
+        if mode == "in_class":
+            # need to hold out samples of the behavior that we're testing on?
+            rah = 0
+    
+    X_train = X_train[1:]
+    idcs = np.arange(0, len(X_train))
+    # give those samples a lil shuffle
+    np.random.shuffle(idcs)
+    print(X_train.shape)
+    # NEXT: need to go through the covar balancing and separate out training y samples
+    y_train = 0
+
+
+
+
+    scores = []
+    y_pred = []
+    
+
+    return scores, y_pred
       
 
 def latency_check(mouse_day: MouseDay):
@@ -469,31 +525,35 @@ if __name__ == "__main__":
     # scores1, preds1 = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class=BEH_CLASSES["learned"])
     # print("Natural behavior model, tested on learned behaviors score: ", np.mean(scores1))
 
-  
+    
     BEH_CLASSES = {"learned": [0, 1, 2], "natural": [3, 4, 5, 6], "reach": [0], "grasp": [1], "carry": [2], "non_movement": [3], "fidget": [4], "eating": [5], "grooming": [6]}
     LEARNED = ["reach", "grasp", "carry"]
     NATURAL = ["non_movement", "fidget", "eating", "grooming"]
 
+    # Wtf is going on with the R2 scores
+    scores, preds = simple_decode_by_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class=BEH_CLASSES["eating"], mode="in_class")
 
-    # testing on natural classes
-    for beh in NATURAL:
-        print(f"(IN-CLASS) Natural model on {beh} data: ")
-        scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class = BEH_CLASSES[beh], mode="in_class")
-        print("scores: ", scores)
+    # # testing on natural classes
+    # for beh in ["eating"]:
+    #     print()
+    #     print(f"(IN-CLASS) Natural model on {beh} data: ")
+    #     scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class = BEH_CLASSES[beh], mode="in_class")
+    #     print("scores: ", scores)
 
-        print(f"(CROSS-CLASS) Learned model on {beh} data: ")
-        scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class = BEH_CLASSES[beh], mode="cross_class")
-        print("scores: ", scores)
+    #     print()
+    #     print(f"(CROSS-CLASS) Learned model on {beh} data: ")
+    #     scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class = BEH_CLASSES[beh], mode="cross_class")
+    #     print("scores: ", scores)
 
-    # testing on learned classes
-    for beh in LEARNED:
-        print(f"(IN-CLASS) Learned model on {beh} data: ")
-        scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class = BEH_CLASSES[beh], mode="in_class")
-        print("scores: ", scores)
+    # # testing on learned classes
+    # for beh in LEARNED:
+    #     print(f"(IN-CLASS) Learned model on {beh} data: ")
+    #     scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class = BEH_CLASSES[beh], mode="in_class")
+    #     print("scores: ", scores)
 
-        print(f"(CROSS-CLASS) Natural model on {beh} data: ")
-        scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class = BEH_CLASSES[beh], mode="cross_class")
-        print("scores: ", scores)
+    #     print(f"(CROSS-CLASS) Natural model on {beh} data: ")
+    #     scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class = BEH_CLASSES[beh], mode="cross_class")
+    #     print("scores: ", scores)
 
-    # s, p = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class=BEH_CLASSES["learned"], mode="cross_class")
-    # s1, p1 = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=BEH_CLASSES["natural"], mode="cross_class")
+    # # s, p = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class=BEH_CLASSES["learned"], mode="cross_class")
+    # # s1, p1 = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=BEH_CLASSES["natural"], mode="cross_class")

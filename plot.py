@@ -707,14 +707,18 @@ if __name__ == "__main__":
     # fig7 = plot_cross_beh_performance(mouse_day, ["reach", "grasp", "carry", "non_movement", "fidget", "eating", "grooming"])
     # plt.show()
 
-    # fig8 = plot_predictions(mouse_day, train_type="natural", test_type="grasp")
-    # plt.show()
+    
 
     CROSS_CLASS_MODE = [("natural", "reach"), ("natural", "grasp"), ("natural", "carry"), ("learned", "non_movement"), ("learned", "fidget"), ("learned", "eating"), ("learned", "grooming")]
     IN_CLASS_MODE = [("learned", "reach"), ("learned", "grasp"), ("learned", "carry"), ("natural", "non_movement"), ("natural", "fidget"), ("natural", "eating"), ("natural", "grooming")]
 
-    fig9 = plot_performance(mouse_day, CROSS_CLASS_MODE, "Cross-class Testing")
-    fig10 = plot_performance(mouse_day, IN_CLASS_MODE, "In-Class Testing")
+    # fig9 = plot_performance(mouse_day, CROSS_CLASS_MODE, "Cross-class Testing")
+    # fig10 = plot_performance(mouse_day, IN_CLASS_MODE, "In-Class Testing")
+    # plt.show()
+
+    fig7 = plot_performance(mouse_day, modes=[("natural", "eating")], mode_type="in_class")
+
+    fig8 = plot_predictions(mouse_day, train_type="natural", test_type="eating")
     plt.show()
 
 

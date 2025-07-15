@@ -37,7 +37,7 @@ def get_days(mouseID):
 # kinematic/camera data
 def load_cam_event_times(mouseID, day):
     s2p_fld = get_s2p_fld(mouseID, day)
-    cam_time_fn = f"{s2p_fld}/kinematics/cam_event_times.pkl"
+    cam_time_fn = f"{s2p_fld}/calcium/cam_event_times.pkl"
     event_times = load_pickle(cam_time_fn)
     # get rid of None entries
     filt_event_times = {k: v for k, v in event_times.items() if v is not None}
@@ -46,7 +46,7 @@ def load_cam_event_times(mouseID, day):
 
 def load_event_labels(mouseID, day):
     s2p_fld = get_s2p_fld(mouseID, day)
-    return np.load(f"{s2p_fld}/kinematics/event_labels.npy")
+    return np.load(f"{s2p_fld}/calcium/event_labels.npy")
 
 
 # calcium data
@@ -146,7 +146,7 @@ def load_tstamp_dict(mouseID, day, type):
         Seconds since Unix Epoch (float) per camera frame (for either calcium camera or kinematics camera, as specified by type param)
     """
     s2p_fld = get_s2p_fld(mouseID, day)
-    tstamps = load_pickle(f"{s2p_fld}/tseries/{type}_timestamps.pkl")
+    tstamps = load_pickle(f"{s2p_fld}/calcium/{type}_timestamps.pkl")
     for event in tstamps:
         tstamps[event] = tstamps[event].to_numpy(dtype=float)
     
@@ -159,7 +159,7 @@ def load_cal_tstamps(mouseID, day):
             Seconds since Unix Epoch (float) per calcium camera frame
     """
     s2p_fld = get_s2p_fld(mouseID, day)
-    cal_tstamps = np.load(f"{s2p_fld}/tseries/calcium_timestamps.npy")
+    cal_tstamps = np.load(f"{s2p_fld}/calcium/calcium_timestamps.npy")
     return cal_tstamps.astype('datetime64[ns]').astype(float)
 
 
@@ -170,10 +170,12 @@ def save_decoded_data(mouseID: str, day: str, scores: list[float] | None, preds:
     np.save(f"{file_path}/{model_type}_preds.npy", preds)
     np.save(f"{file_path}/{model_type}_scores.npy", scores)
 
+
 def save_scores_by_beh(mouseID: str, day: str, scores: dict[int, np.ndarray]):
     file_path = f"{get_drive(mouseID)}/decoded_data/{mouseID}/{day}"
     file_name = f"{file_path}/general_scores_by_behavior.pkl"
     save_pickle(file_name, scores)
+
 
 def load_scores_by_beh(mouseID: str, day: str):
     file_path = f"{get_drive(mouseID)}/decoded_data/{mouseID}/{day}"
