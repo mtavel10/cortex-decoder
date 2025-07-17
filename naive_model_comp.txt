@@ -1,0 +1,204 @@
+training data:  reach, grasp, carry
+testing data:  reach
+min training sample size:  526
+training split:  0
+training split:  1
+training split:  2
+training split:  3
+training split:  4
+training split:  5
+training split:  6
+training split:  7
+training split:  8
+training split:  9
+learned
+reach
+score:  -0.07966149070402756
+
+Function with naive splitting: 
+training data:  reach, grasp, carry
+testing data:  reach
+min test size:  526
+Training split:  0
+Training split:  1
+Training split:  2
+Training split:  3
+Training split:  4
+Training split:  5
+Training split:  6
+Training split:  7
+Training split:  8
+Training split:  9
+score:  0.27081402269355415
+
+--------------------------
+training data:  reach, grasp, carry
+testing data:  grasp
+min training sample size:  526
+training split:  0
+training split:  1
+training split:  2
+training split:  3
+training split:  4
+training split:  5
+training split:  6
+training split:  7
+training split:  8
+training split:  9
+learned
+grasp
+score:  -0.15316932628668142
+
+Function with naive splitting: 
+training data:  reach, grasp, carry
+testing data:  grasp
+min test size:  526
+Training split:  0
+Training split:  1
+Training split:  2
+Training split:  3
+Training split:  4
+Training split:  5
+Training split:  6
+Training split:  7
+Training split:  8
+Training split:  9
+score:  0.045057897764990654
+
+--------------------------
+training data:  reach, grasp, carry
+testing data:  carry
+min training sample size:  368
+training split:  0
+training split:  1
+training split:  2
+training split:  3
+training split:  4
+training split:  5
+training split:  6
+training split:  7
+training split:  8
+training split:  9
+learned
+carry
+score:  0.19285028227940212
+
+Function with naive splitting: 
+training data:  reach, grasp, carry
+testing data:  carry
+min test size:  526
+Training split:  0
+Training split:  1
+Training split:  2
+Training split:  3
+Training split:  4
+Training split:  5
+Training split:  6
+Training split:  7
+Training split:  8
+Training split:  9
+score:  -0.13412177751934412
+
+--------------------------
+training data:  non_movement_or_kept_jumping, fidget, eating
+testing data:  non_movement_or_kept_jumping
+min training sample size:  2169
+training split:  0
+training split:  1
+training split:  2
+training split:  3
+training split:  4
+training split:  5
+training split:  6
+training split:  7
+training split:  8
+training split:  9
+natural
+non_movement
+score:  -0.0962338451375434
+
+Function with naive splitting: 
+training data:  non_movement_or_kept_jumping, fidget, eating
+testing data:  non_movement_or_kept_jumping
+min test size:  2656
+Training split:  0
+Training split:  1
+Training split:  2
+Training split:  3
+Training split:  4
+Training split:  5
+Training split:  6
+Training split:  7
+Training split:  8
+Training split:  9
+score:  -0.10360629235965661
+
+--------------------------
+training data:  non_movement_or_kept_jumping, fidget, eating
+testing data:  fidget
+min training sample size:  1859
+training split:  0
+training split:  1
+training split:  2
+training split:  3
+training split:  4
+training split:  5
+training split:  6
+training split:  7
+training split:  8
+training split:  9
+natural
+fidget
+score:  0.3528441337259324
+
+Function with naive splitting: 
+training data:  non_movement_or_kept_jumping, fidget, eating
+testing data:  fidget
+min test size:  2656
+Training split:  0
+Training split:  1
+Training split:  2
+Training split:  3
+Training split:  4
+Training split:  5
+Training split:  6
+Training split:  7
+Training split:  8
+Training split:  9
+score:  0.31444529354611295
+
+--------------------------
+training data:  non_movement_or_kept_jumping, fidget, eating
+testing data:  eating
+min training sample size:  2656
+training split:  0
+training split:  1
+training split:  2
+training split:  3
+training split:  4
+training split:  5
+training split:  6
+training split:  7
+training split:  8
+training split:  9
+natural
+eating
+score:  -1.1652924322298064
+
+Function with naive splitting: 
+training data:  non_movement_or_kept_jumping, fidget, eating
+testing data:  eating
+min test size:  2656
+Training split:  0
+Training split:  1
+Training split:  2
+Training split:  3
+Training split:  4
+Training split:  5
+Training split:  6
+Training split:  7
+Training split:  8
+Training split:  9
+score:  -0.2920050075878314
+
+--------------------------

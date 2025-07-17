@@ -649,11 +649,11 @@ def plot_performance(mouse_day: MouseDay, modes: list[Tuple[str, str|None]], mod
 
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
 
-    colors = ["skyblue"] # go back and customize to work dynamically depending on the type of train/test
+    colors = ["skyblue", "lightgreen"] # go back and customize to work dynamically depending on the type of train/test
     x_pos = np.arange(len(modes))
      # Create bars
     bars = ax.bar(x_pos, means, yerr=stds, capsize=5, 
-                  color=colors, alpha=0.7, edgecolor='black', linewidth=1)
+                  color=[colors[0]] * 3 + [colors[1]] * 3, alpha=0.7, edgecolor='black', linewidth=1)
     
     # Customize the plot
     ax.set_xlabel('Mode (train x test)', fontsize=12, fontweight='bold')
@@ -709,16 +709,17 @@ if __name__ == "__main__":
 
     
 
-    CROSS_CLASS_MODE = [("natural", "reach"), ("natural", "grasp"), ("natural", "carry"), ("learned", "non_movement"), ("learned", "fidget"), ("learned", "eating"), ("learned", "grooming")]
-    IN_CLASS_MODE = [("learned", "reach"), ("learned", "grasp"), ("learned", "carry"), ("natural", "non_movement"), ("natural", "fidget"), ("natural", "eating"), ("natural", "grooming")]
+    CROSS_CLASS_MODE = [("natural", "reach"), ("natural", "grasp"), ("natural", "carry"), ("learned", "non_movement"), ("learned", "fidget"), ("learned", "eating")]
+    IN_CLASS_MODE = [("learned", "reach"), ("learned", "grasp"), ("learned", "carry"), ("natural", "non_movement"), ("natural", "fidget"), ("natural", "eating")]
 
     # fig9 = plot_performance(mouse_day, CROSS_CLASS_MODE, "Cross-class Testing")
     # fig10 = plot_performance(mouse_day, IN_CLASS_MODE, "In-Class Testing")
     # plt.show()
 
-    fig7 = plot_performance(mouse_day, modes=[("natural", "eating")], mode_type="in_class")
+    fig7 = plot_performance(mouse_day, modes=IN_CLASS_MODE, mode_type="in_class")
+    fig8 = plot_performance(mouse_day, modes=CROSS_CLASS_MODE, mode_type="cross_class")
 
-    fig8 = plot_predictions(mouse_day, train_type="natural", test_type="eating")
+    fig8 = plot_predictions(mouse_day, train_type="learned", test_type="carry")
     plt.show()
 
 
