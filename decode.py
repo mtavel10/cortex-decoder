@@ -623,6 +623,7 @@ if __name__ == "__main__":
     mouseID = "mouse25"
     day = "20240425"
     test_mouse = MouseDay(mouseID, day)
+    test_mouse2 = MouseDay("mouse25", "20240424")
 
     # hold out grooming data
     BEH_CLASSES = {"all": [0, 1, 2, 3, 4, 5], "learned": [0, 1, 2], "natural": [3, 4, 5], "reach": [0], "grasp": [1], "carry": [2], "non_movement": [3], "fidget": [4], "eating": [5], "grooming": [6]}

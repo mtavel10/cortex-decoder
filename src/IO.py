@@ -114,7 +114,7 @@ def load_kinematics_df(key,mouseID,day):
     return df_cam1,df_cam2
 
 
-# Time series retrieval - will modify file path search with glob once we have concatenated files
+# DEPRECIATED - loading in timestamps in dictionary to mark tstamps per event
 def load_tseries(mouseID, day, type):
     """
     Loads time stamp data.
@@ -152,6 +152,7 @@ def load_tstamp_dict(mouseID, day, type):
     
     return tstamps
 
+# DEPRECIATED - loading in timestamps per event (see tstamp dict)
 def load_cal_tstamps(mouseID, day):
     """
     Returns
@@ -163,7 +164,7 @@ def load_cal_tstamps(mouseID, day):
     return cal_tstamps.astype('datetime64[ns]').astype(float)
 
 
-def save_decoded_data(mouseID: str, day: str, scores: list[float] | None, preds: np.ndarray | None, model_type="general"):
+def save_decoded_data(mouseID: str, day: str, scores: list[float]=None, preds: np.ndarray=None, model_type="general"):
     """ Saves decoded scores and predictions for comparison and plotting purposes """
     file_path = f"{get_drive(mouseID)}/decoded_data/{mouseID}/{day}"
     os.makedirs(file_path, mode=0o777, exist_ok=True)

@@ -339,7 +339,7 @@ class MouseDay:
         return tuple(avg_interps)
     
     
-    def interpolate_all(self, features : str) -> {str : tuple[np.ndarray, np.ndarray]}:
+    def interpolate_all(self, features : str) -> dict[str : tuple[np.ndarray, np.ndarray]]:
         kin_avg_interp = {}
         for seg in self.seg_keys:
             if features == "avg":
@@ -389,7 +389,7 @@ class MouseDay:
         trimmed1 = self.get_all_avg_locations()[32:-32]
         return trimmed1
     
-    # FOR MONDAY: TEST THIS FUNCTION
+    
     def get_beh_labels(self):
         """ 
         Returns a 1D numpy array of behavior labels for all valid timepoints (calcium frames) for the day. 

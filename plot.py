@@ -13,6 +13,8 @@ import src.IO as io
 # TEMPORARY
 tseries_max = 4464
 N_PARTS = 14
+plt.rcParams.update({'font.size': 22}) # Sets the default font size to 12
+behavior_model_types = ["reach", "grasp", "carry", "jumping", "fidget", "eating", "grooming", "no behavior", "general"]
 
 def plot_mouseday_data(mouse_day, event_key: str, figsize: Tuple[int, int] = (16, 10)):
     """
@@ -64,49 +66,49 @@ def plot_mouseday_data(mouse_day, event_key: str, figsize: Tuple[int, int] = (16
     # Subplot 1: Camera 1 - X and Y positions over time
     ax1 = axes['left_top']
     ax1.plot(cal_tseries, cam1_avg[0, :], 'b-', linewidth=1.5, label='X position', alpha=0.8)
-    ax1.plot(cal_tseries, cam1_avg[1, :], 'r-', linewidth=1.5, label='Y position', alpha=0.8)
+    ax1.plot(cal_tseries, cam1_avg[1, :], 'g-', linewidth=1.5, label='Y position', alpha=0.8)
 
     # Add event markers
-    for i, (frame, label) in enumerate(zip(cal_event_times, event_labels)):
-        color = event_colors[label]
-        frame_idx = int(frame)
+    # for i, (frame, label) in enumerate(zip(cal_event_times, event_labels)):
+    #     color = event_colors[label]
+    #     frame_idx = int(frame)
         
-        # Plot vertical lines for events
-        # ax1.axvline(cal_tseries[frame_idx], color=color, linestyle='--', linewidth=2, alpha=0.7)
+    #     # Plot vertical lines for events
+    #     # ax1.axvline(cal_tseries[frame_idx], color=color, linestyle='--', linewidth=2, alpha=0.7)
         
-        # Add markers at kinematic positions
-        ax1.plot(cal_tseries[frame_idx], cam1_avg[0, frame_idx], 'o', color=color, markersize=5, 
-                markerfacecolor=color, markeredgecolor='white', markeredgewidth=1)
-        ax1.plot(cal_tseries[frame_idx], cam1_avg[1, frame_idx], 's', color=color, markersize=5, 
-                markerfacecolor=color, markeredgecolor='white', markeredgewidth=1)
+    #     # Add markers at kinematic positions
+    #     ax1.plot(cal_tseries[frame_idx], cam1_avg[0, frame_idx], 'o', color=color, markersize=5, 
+    #             markerfacecolor=color, markeredgecolor='white', markeredgewidth=1)
+    #     ax1.plot(cal_tseries[frame_idx], cam1_avg[1, frame_idx], 's', color=color, markersize=5, 
+    #             markerfacecolor=color, markeredgecolor='white', markeredgewidth=1)
 
     ax1.set_xlim(start_time, end_time)
-    ax1.set_xlabel('CALCIUM Time (s)')
+    ax1.set_xlabel('Unix Time (ns)')
     ax1.set_ylabel('Position (pixels)')
-    ax1.set_title(f'Camera 1 - Hand Position\n{mouse_day.mouseID} {mouse_day.day}')
+    ax1.set_title(f'Camera 1 - Average Hand Positions')
     ax1.legend(loc='upper right')
     ax1.grid(True, alpha=0.3)
     
     # Subplot 2: Camera 2 - X and Y positions over time
     ax2 = axes['right_top']
     ax2.plot(cal_tseries, cam2_avg[0, :], 'b-', linewidth=1.5, label='X position', alpha=0.8)
-    ax2.plot(cal_tseries, cam2_avg[1, :], 'r-', linewidth=1.5, label='Y position', alpha=0.8)
+    ax2.plot(cal_tseries, cam2_avg[1, :], 'g-', linewidth=1.5, label='Y position', alpha=0.8)
     
-    # Add event markers
-    for i, (frame, label) in enumerate(zip(cal_event_times, event_labels)):
-        color = event_colors[label]
-        frame_idx = int(frame)
+    # # Add event markers
+    # for i, (frame, label) in enumerate(zip(cal_event_times, event_labels)):
+    #     color = event_colors[label]
+    #     frame_idx = int(frame)
         
-        # Add markers at kinematic positions
-        ax2.plot(cal_tseries[frame_idx], cam2_avg[0, frame_idx], 'o', color=color, markersize=5, 
-                markerfacecolor=color, markeredgecolor='white', markeredgewidth=1)
-        ax2.plot(cal_tseries[frame_idx], cam2_avg[1, frame_idx], 's', color=color, markersize=5, 
-                markerfacecolor=color, markeredgecolor='white', markeredgewidth=1)
+    #     # Add markers at kinematic positions
+    #     ax2.plot(cal_tseries[frame_idx], cam2_avg[0, frame_idx], 'o', color=color, markersize=5, 
+    #             markerfacecolor=color, markeredgecolor='white', markeredgewidth=1)
+    #     ax2.plot(cal_tseries[frame_idx], cam2_avg[1, frame_idx], 's', color=color, markersize=5, 
+    #             markerfacecolor=color, markeredgecolor='white', markeredgewidth=1)
     
     ax2.set_xlim(start_time, end_time)
-    ax2.set_xlabel('CALCIUM Time (s)')
+    ax2.set_xlabel('Unix Time (ns)')
     ax2.set_ylabel('Position (pixels)')
-    ax2.set_title(f'Camera 2 - Hand Position\n{mouse_day.mouseID} {mouse_day.day}')
+    ax2.set_title(f'Camera 2 - Average Hand Positions')
     ax2.legend(loc='upper right')
     ax2.grid(True, alpha=0.3)
      
@@ -117,23 +119,46 @@ def plot_mouseday_data(mouse_day, event_key: str, figsize: Tuple[int, int] = (16
     clipped_cal_spikes = cal_spikes[32:-32, 32:-32]
     n_neurons, n_frames = clipped_cal_spikes.shape
 
-    # mean = np.mean(clipped_cal_spikes)
-    # std_dev = np.std(clipped_cal_spikes)
-    # z_scores = (clipped_cal_spikes - mean) / std_dev
+    min_spk = np.min(clipped_cal_spikes)
+    max_spk = np.max(clipped_cal_spikes)
 
-    im = ax3.imshow(cal_spikes, cmap='jet',origin='lower', aspect='auto')
+    im = ax3.imshow(clipped_cal_spikes, norm=mcolors.Normalize(min_spk, max_spk))
 
     ax3.margins(1)
     ax3.set_xlim(0, n_frames-1)
-    ax3.set_ylim(0, n_neurons-1)
-    ax3.set_xlabel('Frames')
+    ax3.set_ylim(32, n_neurons-1)
+    ax3.set_xlabel('Timebins')
     ax3.set_ylabel('Neurons')
-    ax3.set_title(f'Calcium Spikes\n{mouse_day.mouseID} {mouse_day.day}')
+    ax3.set_title(f'Calcium Spikes')
 
     # Overall title
-    fig.suptitle(f'Mouse Day Analysis: {mouse_day.mouseID} - {mouse_day.day} - {event_key}', 
+    fig.suptitle(f'Data Collected for {mouse_day.mouseID} on {mouse_day.day}', 
                 fontsize=16, y=0.98)
     fig.subplots_adjust(hspace=0.001)
+    plt.tight_layout()
+    return fig
+
+def plot_spikes(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10)):
+    fig, ax3 = plt.subplots(1, 1, figsize=figsize)
+    cal_spikes = mouse_day.get_trimmed_spks().T
+    # take the first 100 frames
+    cal_spikes = cal_spikes[:, :500]
+    print(cal_spikes.shape)
+    
+    n_neurons, n_frames = cal_spikes.shape
+
+    heatmap = ax3.imshow(cal_spikes, cmap="inferno", norm=mcolors.Normalize(vmin=0, vmax=1))
+    cbar = fig.colorbar(heatmap, ax=ax3)
+    cbar.set_label("normalized inferred firing rate", rotation=270, labelpad=25)
+
+
+    ax3.margins(1)
+    ax3.set_xlim(32, n_frames-1)
+    ax3.set_ylim(0, n_neurons-1)
+    ax3.set_xlabel('Timebins')
+    ax3.set_ylabel('Neurons')
+    ax3.set_title(f'Inferred Calcium Spike Probabilities')
+
     plt.tight_layout()
     return fig
 
@@ -298,7 +323,7 @@ def plot_kin_predictions(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10))
     axes[1, 0].plot(trimmed_tstamps, true_positions[:, 2], 'b-', label="True", linewidth=1.5)
     axes[1, 0].plot(trimmed_tstamps, pred_positions[:, 2], 'r-', label="Predicted", linewidth=1.5, alpha=0.5)
     axes[1, 0].set_title("Camera 2 - X Position")
-    axes[1, 0].set_xlabel("Time (since Unix Epoch - ns)")
+    axes[1, 0].set_xlabel("Unix Time (ns)")
     axes[1, 0].set_ylabel("X Position (pixels)")
     axes[1, 0].legend()
     axes[1, 0].grid(True, alpha=0.3)
@@ -307,13 +332,79 @@ def plot_kin_predictions(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10))
     axes[1, 1].plot(trimmed_tstamps, true_positions[:, 3], 'b-', label="True", linewidth=1.5)
     axes[1, 1].plot(trimmed_tstamps, pred_positions[:, 3], 'r-', label="Predicted", linewidth=1.5, alpha=0.5)
     axes[1, 1].set_title("Camera 2 - Y Position")
-    axes[1, 1].set_xlabel("Time (since Unix Epoch - ns)")
+    axes[1, 1].set_xlabel("Unix Time (ns)")
     axes[1, 1].set_ylabel("Y Position (pixels)")
     axes[1, 1].legend()
     axes[1, 1].grid(True, alpha=0.3)
     
     # Add overall title
-    fig.suptitle("General Model Kinematic Predictions: True vs Predicted Positions", fontsize=16, fontweight='bold')
+    fig.suptitle(f"True vs Predicted Average Mouse-Paw Positions \n {mouse_day.mouseID}, {mouse_day.day}", fontsize=16, fontweight='bold')
+    
+    # Adjust layout to prevent overlap
+    plt.tight_layout()
+    return fig
+
+
+def plot_predictions_notrue(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10)):
+    """ For the poster """
+    scores, pred_positions = io.load_decoded_data(mouse_day.mouseID, mouse_day.day, "general")
+
+    fig, axes = plt.subplots(nrows=4, ncols=1, figsize=figsize)
+    trimmed_tstamps = mouse_day.get_trimmed_cal_tstamps()
+    # Camera 1 X positions
+    axes[3].plot(trimmed_tstamps, pred_positions[:, 0], 'r-', label="Predicted", linewidth=1.5, alpha=0.5)
+    axes[3].set_ylabel("Cam 1 \n X Position")
+    axes[3].grid(True, alpha=0.3)
+    axes[3].tick_params(axis='x', labelbottom=False)
+    axes[3].tick_params(axis='y', labelleft=False)
+    
+    # Camera 1 Y positions
+    axes[2].plot(trimmed_tstamps, pred_positions[:, 1], 'r-', label="Predicted", linewidth=1.5, alpha=0.5)
+    axes[2].set_ylabel("Cam 1 \n Y Position")
+    axes[2].grid(True, alpha=0.3)
+    axes[2].tick_params(axis='x', labelbottom=False)
+    axes[2].tick_params(axis='y', labelleft=False)
+    
+    # Camera 2 X positions
+    axes[1].plot(trimmed_tstamps, pred_positions[:, 2], 'r-', label="Predicted", linewidth=1.5, alpha=0.5)
+    axes[1].set_ylabel("Cam 2 \n X Position")
+    axes[1].grid(True, alpha=0.3)
+    axes[1].tick_params(axis='x', labelbottom=False)
+    axes[1].tick_params(axis='y', labelleft=False)
+    
+    # Camera 2 Y positions
+    axes[0].plot(trimmed_tstamps, pred_positions[:, 3], 'r-', label="Predicted", linewidth=1.5, alpha=0.5)
+    axes[0].set_ylabel("Cam 2 \n Y Position")
+    axes[0].grid(True, alpha=0.3)
+    axes[0].tick_params(axis='x', labelbottom=False)
+    axes[0].tick_params(axis='y', labelleft=False)
+    
+    # Adjust layout to prevent overlap
+    plt.tight_layout()
+
+
+def plot_kin_predictions_simplified(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10)):
+    """
+    True and pred positions are shape (nsamples, 4)
+    Each column holds the following data:
+    cam1_x cam1_y cam2_x cam2_y
+    """
+    scores, pred_positions = io.load_decoded_data(mouse_day.mouseID, mouse_day.day, "general")
+    true_positions = mouse_day.get_trimmed_avg_locs()
+
+    fig, axes = plt.subplots(nrows=1, ncols=1, figsize=figsize)
+    trimmed_tstamps = mouse_day.get_trimmed_cal_tstamps()
+    # Camera 1 X positions
+    axes.plot(trimmed_tstamps, true_positions[:, 0], 'b-', label="True", linewidth=1.5)
+    axes.plot(trimmed_tstamps, pred_positions[:, 0], 'r-', label="Predicted", linewidth=1.5, alpha=0.5)
+    axes.set_title("Camera 1 - X Position")
+    axes.set_xlabel("Time (since Unix Epoch - ns)")
+    axes.set_ylabel("X Position (pixels)")
+    axes.legend()
+    axes.grid(True, alpha=0.3)
+   
+    # Add overall title
+    fig.suptitle(f"True vs Predicted Average Mouse-Paw Positions \n {mouse_day.mouseID}, {mouse_day.day}", fontsize=16, fontweight='bold')
     
     # Adjust layout to prevent overlap
     plt.tight_layout()
@@ -415,6 +506,7 @@ def plot_model_performance(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10
 
     behaviors = mouse_day.BEHAVIOR_LABELS
     model_types = list(behaviors.values()) + ["general"]
+    model_types.remove("grooming")
 
     model_scores: list[list[float]] = []
     for model in model_types:
@@ -427,7 +519,7 @@ def plot_model_performance(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10
     
     # Create bar plot with error bars
     bars = ax.bar(model_types, means, yerr=stds, capsize=5, alpha=0.7, 
-                  color=['skyblue'] * len(behaviors) + ['orange'])
+                  color=['skyblue'] * (len(behaviors) - 1) + ['orange'])
     
     # Customize the plot
     ax.set_ylim(-1, 1)
@@ -447,6 +539,41 @@ def plot_model_performance(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10
                 f'{mean:.3f}±{std:.3f}', ha='center', va='bottom', fontsize=9)
     
     plt.tight_layout()
+    return fig
+
+def plot_model_performance_swarm(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10)):
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
+
+    behaviors = mouse_day.BEHAVIOR_LABELS
+    model_types = list(behaviors.values()) + ["general"]
+
+    x_positions = []
+    all_scores = []
+    for i, model in enumerate(model_types):
+        scores, preds = io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model)
+        
+        # add jitter for better visibility
+        jitter = np.random.normal(0, 0.005, len(scores))
+        x_positions = [i] * len(scores) + jitter
+        ax.scatter(x_positions, scores, alpha=0.5, s=500)
+
+        all_scores.append(scores)
+    
+    means = [np.mean(scores) for scores in all_scores]
+    stds = [np.std(scores) for scores in all_scores]
+
+    ax.errorbar(range(len(model_types)), means, xerr=0.2, fmt='.k', linewidth=3, alpha=0.8)
+    ax.errorbar(range(len(model_types)), means, yerr=stds, fmt='.k', capsize=5, capthick=1.5, linewidth=1.5, alpha=0.8)
+
+    ax.set_xticks(range(len(behavior_model_types)))
+    ax.set_xticklabels(behavior_model_types, rotation=45, ha='right', fontsize=18)
+    ax.set_xlabel("Model")
+    ax.set_ylabel("R² Score")
+    ax.set_title("Performance by Model")
+    ax.set_ylim(0, 1)
+    ax.grid(axis='y', alpha=0.3)
+    plt.tight_layout()
+    
     return fig
 
 def plot_general_performance_by_beh(mouse_day: MouseDay, figsize: Tuple[int, int]=(16,10)):
@@ -497,7 +624,7 @@ def plot_cell_performance(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10)
     ax.set_ylim(0, 0.2)
     ax.set_ylabel("R² Score")
     ax.set_xlabel("Model")
-    ax.set_title("Excitatory vs Inhibiotry Model Performance")
+    ax.set_title("Excitatory vs Inhibitory Model Performance")
     ax.grid(axis='y', alpha=0.3)
     
     # Rotate x-axis labels
@@ -682,50 +809,44 @@ if __name__ == "__main__":
     event_keys = mouse_day.seg_keys
     event_key = event_keys[0]  # Use first available key
     
-    # Plotting Ridge Regression results
-    # fig2 = plot_kin_predictions(mouse_day)
+    # # Plotting Ridge Regression results
+    # fig1 = plot_kin_predictions_simplified(mouse_day)
     # plt.show()
     
-    # Plotting R2 scores by model
-    # fig3 = plot_r2_scores(mouse_day)
+    # # Plotting R2 scores by model
+    # fig2 = plot_model_performance(mouse_day)
     # plt.show()
 
-    # Plotting predictions by moel
-    # figs4 = plot_kin_predictions_by_model(mouse_day)
+    # fig3 = plot_cell_performance(mouse_day)
     # plt.show()
 
-    # # Plot general model performance on each behavior
-    # fig5 = plot_general_performance_by_beh(mouse_day)
+    # CROSS_CLASS_MODE = [("natural", "reach"), ("natural", "grasp"), ("natural", "carry"), ("learned", "non_movement"), ("learned", "fidget"), ("learned", "eating")]
+    # IN_CLASS_MODE = [("learned", "reach"), ("learned", "grasp"), ("learned", "carry"), ("natural", "non_movement"), ("natural", "fidget"), ("natural", "eating")]
+
+    # fig4 = plot_performance(mouse_day, CROSS_CLASS_MODE, "Cross-class Testing")
+    # fig5 = plot_performance(mouse_day, IN_CLASS_MODE, "In-Class Testing")
     # plt.show()
 
-    # fig6 = plot_beh_class_performance(mouse_day)
+    # fig = plot_predictions_notrue(mouse_day)
     # plt.show()
 
-    # fig6 = plot_cell_performance(mouse_day)
+    # fig2 = plot_spikes(mouse_day)
     # plt.show()
 
-    # fig7 = plot_cross_beh_performance(mouse_day, ["reach", "grasp", "carry", "non_movement", "fidget", "eating", "grooming"])
+
+    # fig8 = plot_predictions(mouse_day, train_type="learned", test_type="carry")
     # plt.show()
-
-    
-
-    CROSS_CLASS_MODE = [("natural", "reach"), ("natural", "grasp"), ("natural", "carry"), ("learned", "non_movement"), ("learned", "fidget"), ("learned", "eating")]
-    IN_CLASS_MODE = [("learned", "reach"), ("learned", "grasp"), ("learned", "carry"), ("natural", "non_movement"), ("natural", "fidget"), ("natural", "eating")]
-
-    # fig9 = plot_performance(mouse_day, CROSS_CLASS_MODE, "Cross-class Testing")
-    # fig10 = plot_performance(mouse_day, IN_CLASS_MODE, "In-Class Testing")
-    # plt.show()
-
-    fig7 = plot_performance(mouse_day, modes=IN_CLASS_MODE, mode_type="in_class")
-    fig8 = plot_performance(mouse_day, modes=CROSS_CLASS_MODE, mode_type="cross_class")
-
-    fig8 = plot_predictions(mouse_day, train_type="learned", test_type="carry")
-    plt.show()
 
 
     # Create comprehensive plot of mouseday data
     # fig1 = plot_mouseday_data(mouse_day, event_key)
     # plt.show()
+
+    # spkfig = plot_spikes(mouse_day)
+    # plt.show()
+
+    scat = plot_model_performance_swarm(mouse_day)
+    plt.show()
 
     # Test Interpolation function
     # for key in event_keys:
