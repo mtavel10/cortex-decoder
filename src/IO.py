@@ -167,6 +167,7 @@ def load_cal_tstamps(mouseID, day):
 def save_decoded_data(mouseID: str, day: str, scores: list[float]=None, preds: np.ndarray=None, model_type="general"):
     """ Saves decoded scores and predictions for comparison and plotting purposes """
     file_path = f"{get_drive(mouseID)}/decoded_data/{mouseID}/{day}"
+    print("saving to...", file_path)
     os.makedirs(file_path, mode=0o777, exist_ok=True)
     np.save(f"{file_path}/{model_type}_preds.npy", preds)
     np.save(f"{file_path}/{model_type}_scores.npy", scores)

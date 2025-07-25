@@ -101,7 +101,7 @@ test size:  796 ,  796
 training split:  2
 test size:  796 ,  796
 training split:  3
-test size:  796 ,  796
+test size:  796 ,print("test size: ", len(X_test))  796
 training split:  4
 test size:  796 ,  796
 training split:  5

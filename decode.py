@@ -12,15 +12,26 @@ import plot as myplot
 import matplotlib.pyplot as plt
 
 TEST_SIZE = .30 # 70/30 split duhhh
+BEH_CLASSES = {"all": [0, 1, 2, 3, 4, 5], "learned": [0, 1, 2], "natural": [3, 4, 5], "reach": [0], "grasp": [1], "carry": [2], "non_movement": [3], "fidget": [4], "eating": [5], "grooming": [6]}
+LEARNED = ["reach", "grasp", "carry"]
+NATURAL = ["non_movement", "fidget", "eating"]
 
-def general_ridge(mouse_day: MouseDay, n_trials: int=10):
+
+def decode_general(mouse_day: MouseDay, n_trials: int=10, save_res=False):
+    """
+    Decodes all the samples across the entire population of neurons. 
+        Train: General, Test: General
+    """
     X = mouse_day.get_trimmed_spks()
     y = mouse_day.get_trimmed_avg_locs()
     beh_per_frame = mouse_day.get_trimmed_beh_labels()
+    print(X)
+    print(y.shape)
+    print(beh_per_frame.shape)
     scores = []
     y_preds = []
     # Splitter object
-    splitter = StratifiedShuffleSplit(n_splits=n_trials, test_size=0.3, train_size=0.7, random_state=42)
+    splitter = StratifiedKFold(n_splits=n_trials, shuffle=True, random_state=42)
 
     # Cross-validate to find the best alpha
     ridge = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0], fit_intercept=True)
@@ -47,17 +58,19 @@ def general_ridge(mouse_day: MouseDay, n_trials: int=10):
     for test_idcs, pred in y_preds:
         y_pred[test_idcs] = pred
     
-    # saves the scores and predictions for plotting
-    io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type="general")
-    # saves the last training iteration just in case
-    io.save_model(mouse_day.mouseID, mouse_day.day, ridge)
+    if (save_res):
+        # saves the scores and predictions for plotting
+        io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type="general")
+        # saves the last training iteration just in case
+        io.save_model(mouse_day.mouseID, mouse_day.day, ridge)
 
-    return scores, y, y_pred
+    return scores, y_pred
 
 
-def ridge_by_beh(mouse_day: MouseDay, n_trials: int=10):
+def decode_behaviors(mouse_day: MouseDay, n_trials: int=10, save_res=False):
     """
-    Separates the data by behavior label, trains a seperate model per behavior and returns a list of those weights (indexed by behavior label)
+    Decodes behaviors with models trained on that specific behavior. 
+        Train: By Behavior, Test: By Behavior
     """
     X = mouse_day.get_trimmed_spks()
     y = mouse_day.get_trimmed_avg_locs()
@@ -91,17 +104,6 @@ def ridge_by_beh(mouse_day: MouseDay, n_trials: int=10):
             trial_score = ridge.score(X_test, y_test)
             scores.append(trial_score)
 
-        #     # Predict locations for this test fold
-        #     # Only predict on test data for this fold
-        #     y_pred_fold = ridge.predict(X_test)
-        #     y_preds.append((test_idcs, y_pred_fold))
-        
-        # # Reconstruct full predictions (but only for timepoints of this behavior??)
-        # y_pred = np.zeros_like(y)
-        # for test_idcs, pred in y_preds:
-        #     y_pred[test_idcs] = pred
-        # print(y_pred)
-
         # Make an overall prediction on all data using the last iteration of this behavior model
         # Not that precise of a location prediction but pred data more for sanity check than anything
         y_pred = ridge.predict(X)
@@ -110,16 +112,17 @@ def ridge_by_beh(mouse_day: MouseDay, n_trials: int=10):
         all_scores.append(scores)
         print("scores: ", scores)
 
-        # save model
-        io.save_model(mouse_day.mouseID, mouse_day.day, ridge, labels[label])
-        io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type=labels[label])
+        if (save_res):
+            io.save_model(mouse_day.mouseID, mouse_day.day, ridge, labels[label])
+            io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type=labels[label])
 
     return all_scores, y_preds
 
 
-def ridge_test_by_beh(mouse_day: MouseDay, ntrials: int=10):
+def decode_behaviors_with_general(mouse_day: MouseDay, ntrials: int=10, save_res=False):
     """
-    Training a general model, holding out certain samples that are representative of behavior... then testing that general model by samples grouped by behavior. 
+    Decodes specific behavior samples using a model trained on the general population. 
+        Train: General, Test: By Behavior
     """
     X = mouse_day.get_trimmed_spks()
     y = mouse_day.get_trimmed_avg_locs()
@@ -209,10 +212,10 @@ def ridge_test_by_beh(mouse_day: MouseDay, ntrials: int=10):
 
     return scores_by_beh
 
-def ridge_by_cell(mouse_day: MouseDay, ntrials: int=10):
+def decode_by_cell(mouse_day: MouseDay, ntrials: int=10, save_res=False):
     """
-    Running 2 ridge regressions on different feature spaces: excitatory and inhibitory interneurons. 
-    Motivation: Is it easier to predict on excitatory or inhibitory neural data?
+    Decodes neural activity by cell type (inhibitory vs excitatory). Splits data into two groups of neurons and trains/tests two models on their own cell's data. 
+        Train: By Cell, Test: By cell
     """
     cell_labels = mouse_day.cell_labels
     data = mouse_day.get_trimmed_spks()
@@ -280,7 +283,11 @@ def ridge_by_cell(mouse_day: MouseDay, ntrials: int=10):
 
     return in_scores, in_preds, ex_scores, ex_preds
 
-def ridge_by_class(mouse_day: MouseDay, beh_class: str, ntrials: int=10):
+def decode_by_class(mouse_day: MouseDay, beh_class: str, ntrials: int=10, save_res=False):
+    """
+    Decodes specific classes of behavior (either "natural" or "learned") and tests within that class. 
+        Train: BehClass, Test: BehClass
+    """
     spikes = mouse_day.get_trimmed_spks()
     locs = mouse_day.get_trimmed_avg_locs() 
     beh_per_frame = mouse_day.get_trimmed_beh_labels()
@@ -323,96 +330,6 @@ def ridge_by_class(mouse_day: MouseDay, beh_class: str, ntrials: int=10):
     return scores, y_pred
 
 
-def decode_cross_beh_class(mouse_day: MouseDay, train_class: list[int], test_class: list[int], mode: str, save_res=True, ntrials: int=10):
-    """
-    NAIVE!!!! DONT USE ANYMORE!!!! TEST DATA LEAKS INTO TRAIN DATA NO NO NO STAY AWAY FROM THIS FUNC
-    Train and test classes contain behavior labels belonging to certain "classes". Can select which behaviors to train/test on dynamically. 
-        mode
-            either "cross_class" or "in_class"
-    """
-    behavior_labels: dict[int, str] = mouse_day.BEHAVIOR_LABELS
-    print("Function with naive splitting: ")
-    print("training data: ", ", ".join(behavior_labels[beh] for beh in train_class))
-    print("testing data: ", ", ".join(behavior_labels[beh] for beh in test_class))
-
-    spikes: np.ndarray = mouse_day.get_trimmed_spks()
-    locs: np.ndarray = mouse_day.get_trimmed_avg_locs() 
-    beh_per_frame:np.ndarray = mouse_day.get_trimmed_beh_labels()
-    
-    # separate out data by behavior class
-    # Problem: For decoding behaviors with a model trained on their own behavior class, wouldn't there be a bias towards behaviors with more samples?
-    # Should each training dataset be segmented into representative sample-sizes?
-    # # yes: do "covariate balancing"
-
-    training_beh_frames = np.where(np.isin(beh_per_frame, train_class))[0]
-    X = spikes[training_beh_frames]
-    y = locs[training_beh_frames]
-
-    testing_beh_frames = np.where(np.isin(beh_per_frame, test_class))[0]
-    X_test = spikes[testing_beh_frames]
-    y_test = locs[testing_beh_frames]
-
-
-    min_test_size = 100000000000000000000
-    # limiting it to the smallest sample size so that no group is biased
-    if (mode == "cross_class"):
-        classes = BEH_CLASSES["learned"] + BEH_CLASSES["natural"]
-    elif (mode == "in_class"):
-        # find the minimum size within this class
-        classes = train_class
-    for beh in classes:
-        num_beh_frames = np.sum(beh == beh_per_frame)
-        if num_beh_frames < min_test_size:
-            min_test_size = num_beh_frames
-        
-    print("min test size: ", min_test_size)
-
-    # to sort training data by behavior group to ensure equal distribution
-    training_bpf = beh_per_frame[training_beh_frames]
-    
-    ridge = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0], fit_intercept=True)
-    splitter = StratifiedShuffleSplit(n_splits=ntrials, test_size=TEST_SIZE, train_size = 1-TEST_SIZE)
-
-    np.random.seed(42)
-
-    scores = []
-    for i, (train_idcs, test_idcs) in enumerate(splitter.split(X, training_bpf)):
-        print("Training split: ", i)
-        X_train = X[train_idcs]
-        y_train = y[train_idcs]
-
-        ridge.fit(X_train, y_train)
-
-        # 10 shuffles/tests on the tested behavior/behavior class. sample size limited to the smallest behavior class sample size
-        test_indices = np.arange(len(X_test))
-        np.random.shuffle(test_indices)
-
-        X_test_fold, y_test_fold = X_test[test_indices], y_test[test_indices]
-        X_test_fold, y_test_fold = X_test[:min_test_size], y_test[:min_test_size]
-        
-        # fig, ax = plt.subplots(nrows=1, ncols=1)
-        # ax.plot(y_test_fold, label="y_test_fold")
-        # ax.plot(y_train, label="y_train")
-        scores.append(ridge.score(X_test_fold, y_test_fold))
-        
-    # make predictions on cross-testing class - not robust, since using the most recent ridge object, just for sanity check
-    y_pred = ridge.predict(X_test)
-
-    # put these predictions into a matrix of the same size as the original y, zero out where behavior isn't here
-    y_pred_full = np.zeros_like(locs)
-    for frame in range(0, len(y_pred_full)):
-        if frame in testing_beh_frames:
-            y_pred_full[frame] = y_pred[np.where(testing_beh_frames == frame)]
-        else:
-            y_pred_full[frame] = 0
-
-    if (save_res):
-        train_class_type = [key for key, value in BEH_CLASSES.items() if value==train_class][0]
-        test_class_type = [key for key, value in BEH_CLASSES.items() if value==test_class][0]
-        io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred_full, model_type=f"{train_class_type}_x_{test_class_type}")
-
-    return scores, y_pred_full
-
 def smallest_sample_size(mouse_day: MouseDay, beh_list: list[int]) -> Tuple[int, list[int]]:
     """
     Helper function for decode by class to generate uniform test set sizes across all behaviors. 
@@ -430,9 +347,10 @@ def smallest_sample_size(mouse_day: MouseDay, beh_list: list[int]) -> Tuple[int,
     return int(min_samples), sample_sizes
 
 
-def simple_decode_by_class(mouse_day: MouseDay, train_class: list[int], test_class: list[int], mode: str, save_res=True, ntrials: int=10):
+
+def decode_behaviors_with_class(mouse_day: MouseDay, train_class: list[int], test_class: list[int], mode: str, ntrials: int=10, save_res=False):
     """
-    Wtf is going on with these R^2 scores
+    Decodes a specific behavior using an "in-class" or "cross-class" model. 
     """
     
     behavior_labels: dict[int, str] = mouse_day.BEHAVIOR_LABELS
@@ -599,11 +517,13 @@ def simple_decode_by_class(mouse_day: MouseDay, train_class: list[int], test_cla
       
 
 def latency_check(mouse_day: MouseDay):
-    print("# of timestamps (calcium): ", test_mouse.cal_ntimestamps)
-    print("# of datapoints (calcium): ", test_mouse.cal_nframes)
+    print("# of timestamps (calcium): ", mouse_day.cal_ntimestamps)
+    print("# of datapoints (calcium): ", mouse_day.cal_nframes)
     mouse_day.check_caltime_latency()
+    return 0
 
 def dimensions_check(mouse_day: MouseDay):
+    # Go back and figure out how the lengths differ...and why this func takes a hot sec
     test_locs = mouse_day.get_trimmed_avg_locs()
     test_untrimmedlocs = mouse_day.get_all_avg_locations()
     test_spikes = mouse_day.get_trimmed_spks()
@@ -617,32 +537,46 @@ def dimensions_check(mouse_day: MouseDay):
     print("Trimmed Locs: ", test_locs.shape)
     print("Trimmed Spikes: ", test_spikes.shape)
 
-    print("Num labels: ", len(test_labels))
+    print("Untrimmed labels: ", len(test_labels))
+    return 0
+
+def md_test(mouse_day: MouseDay, save_res=False):
+    """
+    Just to make sure all the mice are mice-ing. 
+    Runs EVERYTHING. 
+    """
+    # latency_check(mouse_day)
+    # dimensions_check(mouse_day)
+
+    # fig = myplot.plot_interp_test(mouse_day, mouse_day.seg_keys[0])
+    # plt.show()
+
+    s, p = decode_general(mouse_day, save_res=True)
+    s1, p1 = decode_behaviors(mouse_day, save_res=True)
+    fig1 = myplot.plot_kin_predictions(mouse_day)
+    fig2 = myplot.plot_kin_predictions_by_model(mouse_day)
+    plt.show()
+    return 0
+
 
 if __name__ == "__main__":
     mouseID = "mouse25"
-    day = "20240425"
-    test_mouse = MouseDay(mouseID, day)
-    test_mouse2 = MouseDay("mouse25", "20240424")
+    april25 = MouseDay(mouseID, "20240425")
+    april24 = MouseDay(mouseID, "20240424")
 
-    # hold out grooming data
-    BEH_CLASSES = {"all": [0, 1, 2, 3, 4, 5], "learned": [0, 1, 2], "natural": [3, 4, 5], "reach": [0], "grasp": [1], "carry": [2], "non_movement": [3], "fidget": [4], "eating": [5], "grooming": [6]}
-    LEARNED = ["reach", "grasp", "carry"]
-    NATURAL = ["non_movement", "fidget", "eating"]
+    md_test(april24)
 
-    # scores, preds = simple_decode_by_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=BEH_CLASSES["reach"], mode="in_class")
-    # print("score: ", np.mean(scores))
 
-    # # Wtf is going on with the R2 scores
-    for beh in LEARNED:
-        scores, preds = simple_decode_by_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=BEH_CLASSES[beh], mode="in_class")
-        print("score: ", np.mean(scores))
-        print()
 
-    for beh in NATURAL:
-        scores, preds = simple_decode_by_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class=BEH_CLASSES[beh], mode="in_class")
-        print("score: ", np.mean(scores))
-        print()
+    # for beh in LEARNED:
+    #     scores, preds = simple_decode_by_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=BEH_CLASSES[beh], mode="in_class")
+    #     print("score: ", np.mean(scores))
+    #     print()
+
+    # for beh in NATURAL:
+    #     scores, preds = simple_decode_by_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class=BEH_CLASSES[beh], mode="in_class")
+    #     print("score: ", np.mean(scores))
+    #     print()
 
         
     # all_beh_scores, all_beh_preds = ridge_by_beh(test_mouse)

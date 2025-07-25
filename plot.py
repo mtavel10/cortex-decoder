@@ -175,6 +175,7 @@ def plot_interp_test(mouse_day, event_key: str, figsize: Tuple[int, int] = (16, 
             y2_plot         y2_interp_plot
         
     """
+    plt.rcParams.update({'font.size': 12})
     fig, axes = plt.subplots(nrows=4, ncols=2, figsize=figsize)
     
     # Regular Data
@@ -215,8 +216,8 @@ def plot_interp_test(mouse_day, event_key: str, figsize: Tuple[int, int] = (16, 
     cal_times = mouse_day.cal_tstamp_dict[event_key]
     max_frames = len(cal_times)
     cam1_interp, cam2_interp = mouse_day.interpolate_avgkin2cal(event_key)
-    print(cam1_interp)
-    print(cam2_interp)
+    # print(cam1_interp)
+    # print(cam2_interp)
     cam1_interp = cam1_interp[:, :max_frames]
     cam2_interp = cam2_interp[:, :max_frames]
     
@@ -307,7 +308,7 @@ def plot_kin_predictions(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10))
     axes[0, 0].set_title("Camera 1 - X Position")
     axes[0, 0].set_xlabel("Time (since Unix Epoch - ns)")
     axes[0, 0].set_ylabel("X Position (pixels)")
-    axes[0, 0].legend()
+    axes[0, 0].legend(fontsize=14)
     axes[0, 0].grid(True, alpha=0.3)
     
     # Camera 1 Y positions
@@ -316,7 +317,7 @@ def plot_kin_predictions(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10))
     axes[0, 1].set_title("Camera 1 - Y Position")
     axes[0, 1].set_xlabel("Time (since Unix Epoch - ns)")
     axes[0, 1].set_ylabel("Y Position (pixels)")
-    axes[0, 1].legend()
+    axes[0, 1].legend(fontsize=14)
     axes[0, 1].grid(True, alpha=0.3)
     
     # Camera 2 X positions
@@ -325,7 +326,7 @@ def plot_kin_predictions(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10))
     axes[1, 0].set_title("Camera 2 - X Position")
     axes[1, 0].set_xlabel("Unix Time (ns)")
     axes[1, 0].set_ylabel("X Position (pixels)")
-    axes[1, 0].legend()
+    axes[1, 0].legend(fontsize=14)
     axes[1, 0].grid(True, alpha=0.3)
     
     # Camera 2 Y positions
@@ -334,7 +335,7 @@ def plot_kin_predictions(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10))
     axes[1, 1].set_title("Camera 2 - Y Position")
     axes[1, 1].set_xlabel("Unix Time (ns)")
     axes[1, 1].set_ylabel("Y Position (pixels)")
-    axes[1, 1].legend()
+    axes[1, 1].legend(fontsize=14)
     axes[1, 1].grid(True, alpha=0.3)
     
     # Add overall title
@@ -342,6 +343,52 @@ def plot_kin_predictions(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10))
     
     # Adjust layout to prevent overlap
     plt.tight_layout()
+    return fig
+
+
+def plot_kin_predictions_vertical(mouse_day: MouseDay, figsize: Tuple[int, int]=(8, 19)):
+    """
+    True and pred positions are shape (nsamples, 4)
+    Each column holds the following data:
+    cam1_x cam1_y cam2_x cam2_y
+    """
+    scores, pred_positions = io.load_decoded_data(mouse_day.mouseID, mouse_day.day, "general")
+    true_positions = mouse_day.get_trimmed_avg_locs()
+    
+    # Changed to 4 rows, 1 column for vertical stacking
+    fig, axes = plt.subplots(nrows=4, ncols=1, figsize=figsize)
+    trimmed_tstamps = mouse_day.get_trimmed_cal_tstamps()
+    
+    # Create uniform x-axis range
+    x_uniform = np.linspace(0, 1, len(trimmed_tstamps))
+    
+    # Camera 1 X positions
+    axes[0].plot(x_uniform, true_positions[:, 0], 'b-', linewidth=1.5)
+    axes[0].plot(x_uniform, pred_positions[:, 0], 'r-', linewidth=1.5, alpha=0.5)
+    axes[0].set_title("Camera 1 - X Position")
+    axes[0].grid(True, alpha=0.3)
+    
+    # Camera 1 Y positions
+    axes[1].plot(x_uniform, true_positions[:, 1], 'b-', linewidth=1.5)
+    axes[1].plot(x_uniform, pred_positions[:, 1], 'r-', linewidth=1.5, alpha=0.5)
+    axes[1].set_title("Camera 1 - Y Position")
+    axes[1].grid(True, alpha=0.3)
+    
+    # Camera 2 X positions
+    axes[2].plot(x_uniform, true_positions[:, 2], 'b-', linewidth=1.5)
+    axes[2].plot(x_uniform, pred_positions[:, 2], 'r-', linewidth=1.5, alpha=0.5)
+    axes[2].set_title("Camera 2 - X Position")
+    axes[2].grid(True, alpha=0.3)
+    
+    # Camera 2 Y positions
+    axes[3].plot(x_uniform, true_positions[:, 3], 'b-', linewidth=1.5)
+    axes[3].plot(x_uniform, pred_positions[:, 3], 'r-', linewidth=1.5, alpha=0.5)
+    axes[3].set_title("Camera 2 - Y Position")
+    axes[3].grid(True, alpha=0.3)
+
+    # Adjust layout to prevent overlap
+    plt.tight_layout()
+    plt.subplots_adjust(hspace=0.5)
     return fig
 
 
@@ -555,23 +602,27 @@ def plot_model_performance_swarm(mouse_day: MouseDay, figsize: Tuple[int, int]=(
         # add jitter for better visibility
         jitter = np.random.normal(0, 0.005, len(scores))
         x_positions = [i] * len(scores) + jitter
-        ax.scatter(x_positions, scores, alpha=0.5, s=500)
+        ax.scatter(x_positions, scores, alpha=0.5, s=1000)
 
         all_scores.append(scores)
     
     means = [np.mean(scores) for scores in all_scores]
     stds = [np.std(scores) for scores in all_scores]
 
+      
     ax.errorbar(range(len(model_types)), means, xerr=0.2, fmt='.k', linewidth=3, alpha=0.8)
     ax.errorbar(range(len(model_types)), means, yerr=stds, fmt='.k', capsize=5, capthick=1.5, linewidth=1.5, alpha=0.8)
+    
 
     ax.set_xticks(range(len(behavior_model_types)))
-    ax.set_xticklabels(behavior_model_types, rotation=45, ha='right', fontsize=18)
-    ax.set_xlabel("Model")
-    ax.set_ylabel("R² Score")
-    ax.set_title("Performance by Model")
+    ax.set_xticklabels(behavior_model_types, rotation=45, ha='right', fontsize=15)
+    ax.set_xlabel("Model", fontsize=18)
+    ax.set_ylabel("R² Score", fontsize=18)
+    ax.set_title("Performance by Model", fontsize=30)
     ax.set_ylim(0, 1)
     ax.grid(axis='y', alpha=0.3)
+    ax.set_xlim(-0.5, len(model_types) - 0.5)
+
     plt.tight_layout()
     
     return fig
@@ -636,6 +687,44 @@ def plot_cell_performance(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10)
         ax.text(bar.get_x() + bar.get_width()/2., height + std + 0.02,
                 f'{mean:.3f}±{std:.3f}', ha='center', va='bottom', fontsize=9)
     
+    plt.tight_layout()
+    return fig
+
+def plot_cell_performance_swarm(mouse_day: MouseDay, figsize: Tuple[int, int]=(10, 10)):
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
+    
+    # Load data
+    ex_scores, ex_preds = io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type="excitatory")
+    in_scores, in_preds = io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type="inhibitory")
+    
+    cell_types = ["excitatory", "inhibitory"]
+    all_scores = [ex_scores, in_scores]
+    
+    # Create swarm plot with jitter
+    for i, (cell_type, scores) in enumerate(zip(cell_types, all_scores)):
+        # Add jitter for better visibility
+        jitter = np.random.normal(0, 0.05, len(scores))
+        x_positions = np.array([i] * len(scores)) + jitter
+        ax.scatter(x_positions, scores, alpha=0.5, s=500)
+    
+    # Calculate means and stds
+    means = [np.mean(scores) for scores in all_scores]
+    stds = [np.std(scores) for scores in all_scores]
+    
+    # Horizontal error bars for visual separation
+    ax.errorbar(range(len(cell_types)), means, xerr=0.2, fmt='.k', linewidth=3, alpha=0.8)
+    # Vertical error bars for standard deviation
+    ax.errorbar(range(len(cell_types)), means, yerr=stds, fmt='.k', capsize=5, capthick=1.5, linewidth=1.5, alpha=0.8)
+    
+    # Customize the plot
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(cell_types, ha='center', fontsize=18)
+    ax.set_ylabel("R² Score", fontsize=18)
+    ax.set_xlabel("Model", fontsize=18)
+    ax.set_title("Model Performance by Cell Type", fontsize=30)
+    ax.set_ylim(0, 0.15)
+    ax.set_xlim(-0.5, 1.5)
+    ax.grid(axis='y', alpha=0.3)
     plt.tight_layout()
     return fig
 
@@ -765,10 +854,10 @@ def plot_performance(mouse_day: MouseDay, modes: list[Tuple[str, str|None]], mod
     for mode in modes:
         if mode[1] == None: # default: training data class is the same as testing data class
             scores_list.append(io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type=mode[0])[0])
-            model_labels.append(f"{mode[0]} x {mode[0]}")
+            model_labels.append(f"{mode[0]} \n x \n {mode[0]}")
         else:
             scores_list.append(io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type=f"{mode[0]}_x_{mode[1]}")[0])
-            model_labels.append(f"{mode[0]} x {mode[1]}")
+            model_labels.append(f"{mode[0]} \n x \n {mode[1]}")
     
     # Calculate means and standard deviations
     means = [np.mean(scores) for scores in scores_list]
@@ -803,6 +892,75 @@ def plot_performance(mouse_day: MouseDay, modes: list[Tuple[str, str|None]], mod
     plt.tight_layout()
     return fig
 
+def plot_performance_swarm(mouse_day: MouseDay, modes: list[Tuple[str, str|None]], mode_type: str, figsize: Tuple[int, int]=(16, 10)):
+    """
+    Plots performance of different models dynamically based on the train type and test type (if test type is None, then the training data was the same type as the testing data)
+    Parameters
+    modes : List[Tuple[str | None]]
+    """
+    scores_list = []
+    model_labels = []
+    train_types = []
+    
+    for mode in modes:
+        if mode[1] == None:  # default: training data class is the same as testing data class
+            scores_list.append(io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type=mode[0])[0])
+            model_labels.append(f"{mode[0]} \n x \n {mode[0]}")
+            train_types.append(mode[0])
+        else:
+            scores_list.append(io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type=f"{mode[0]}_x_{mode[1]}")[0])
+            model_labels.append(f"{mode[0]} \n x \n {mode[1]}")
+            train_types.append(mode[0])
+    
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
+    
+    # Create color map for train types
+    unique_train_types = list(set(train_types))
+    colors = plt.cm.tab10(np.linspace(0, 1, len(unique_train_types)))
+    train_color_map = {train_type: colors[i] for i, train_type in enumerate(unique_train_types)}
+    
+    # Create swarm plot with jitter, colored by train type
+    for i, (scores, train_type) in enumerate(zip(scores_list, train_types)):
+        # Add jitter for better visibility
+        jitter = np.random.normal(0, 0.05, len(scores))
+        x_positions = np.array([i] * len(scores)) + jitter
+        ax.scatter(x_positions, scores, alpha=0.5, s=500, 
+                  color=train_color_map[train_type], label=train_type if i == train_types.index(train_type) else "")
+    
+    # Calculate means and standard deviations
+    means = [np.mean(scores) for scores in scores_list]
+    stds = [np.std(scores) for scores in scores_list]
+    
+    # Define cohesive colors for error bars
+    positive_color = '#2E7D32'  # Dark green that works well with tab10 palette
+    negative_color = '#C62828'  # Dark red that works well with tab10 palette
+    
+    # Plot error bars with colors based on mean values
+    for i, (mean, std) in enumerate(zip(means, stds)):
+        error_color = positive_color if mean >= 0 else negative_color
+        
+        # Horizontal error bars for visual separation
+        ax.errorbar([i], [mean], xerr=0.4, fmt='.', color=error_color, 
+                   linewidth=5, alpha=0.8, markersize=8)
+        # Vertical error bars for standard deviation
+        # # ax.errorbar([i], [mean], yerr=std, fmt='.', color='k', 
+        #            capsize=5, capthick=2, linewidth=2, alpha=0.8, markersize=8)
+    
+    # Customize the plot
+    ax.set_xticks(range(len(modes)))
+    ax.set_xticklabels(model_labels, ha='center', fontsize=15)
+    ax.set_xlabel('Mode (train x test)', fontsize=18)
+    ax.set_ylabel('R² Score', fontsize=18)
+    ax.set_title(f"{mode_type}", fontsize=30)
+    ax.set_xlim(-0.5, len(modes) - 0.5)  # Make categories closer together
+    ax.grid(axis='y', alpha=0.3)
+    
+    # Add legend for train types
+   #  ax.legend(title="Train Class", bbox_to_anchor=(1.05, 1), loc='best', fontsize=15)
+    
+    plt.tight_layout()
+    return fig
+
 if __name__ == "__main__":
 
     mouse_day = MouseDay('mouse25', '20240425')
@@ -820,8 +978,8 @@ if __name__ == "__main__":
     # fig3 = plot_cell_performance(mouse_day)
     # plt.show()
 
-    # CROSS_CLASS_MODE = [("natural", "reach"), ("natural", "grasp"), ("natural", "carry"), ("learned", "non_movement"), ("learned", "fidget"), ("learned", "eating")]
-    # IN_CLASS_MODE = [("learned", "reach"), ("learned", "grasp"), ("learned", "carry"), ("natural", "non_movement"), ("natural", "fidget"), ("natural", "eating")]
+    CROSS_CLASS_MODE = [("natural", "reach"), ("natural", "grasp"), ("natural", "carry"), ("learned", "non_movement"), ("learned", "fidget"), ("learned", "eating")]
+    IN_CLASS_MODE = [("learned", "reach"), ("learned", "grasp"), ("learned", "carry"), ("natural", "non_movement"), ("natural", "fidget"), ("natural", "eating")]
 
     # fig4 = plot_performance(mouse_day, CROSS_CLASS_MODE, "Cross-class Testing")
     # fig5 = plot_performance(mouse_day, IN_CLASS_MODE, "In-Class Testing")
@@ -845,8 +1003,24 @@ if __name__ == "__main__":
     # spkfig = plot_spikes(mouse_day)
     # plt.show()
 
-    scat = plot_model_performance_swarm(mouse_day)
+    # scat = plot_performance_swarm(mouse_day, CROSS_CLASS_MODE, "Cross-Class Performance", figsize=(16, 7.5))
+    # scat2 = plot_performance_swarm(mouse_day, IN_CLASS_MODE, "In-Class Performance", figsize=(16, 7.5))
+    # scat3 = plot_cell_performance_swarm(mouse_day, figsize=(12, 10))
+    # plt.show()
+
+
+
+    fig1 = plot_kin_predictions(mouse_day)
+
+    fig2 = plot_kin_predictions_simplified(mouse_day)
+
+    fig3 = plot_kin_predictions_vertical(mouse_day)
+
     plt.show()
+
+
+    # preds1 = plot_kin_predictions_by_model(mouse_day)
+    # plt.show()
 
     # Test Interpolation function
     # for key in event_keys:
