@@ -4,6 +4,8 @@ import glob
 import pandas as pd
 import src.utils
 import os
+import mat73
+
 
 def load_pickle(filepath):
     with open(filepath, 'rb') as file:
@@ -162,6 +164,58 @@ def load_cal_tstamps(mouseID, day):
     s2p_fld = get_s2p_fld(mouseID, day)
     cal_tstamps = np.load(f"{s2p_fld}/calcium/calcium_timestamps.npy")
     return cal_tstamps.astype('datetime64[ns]').astype(float)
+
+def load_reg_dict(mouseID, day) -> np.ndarray:
+    """
+    Returns a dictionary of day i's 
+    """
+    reg_dir= f"{get_drive(mouseID)}/{mouseID}/registered_cell_pairs"
+    mat_paths = os.listdir(reg_dir)
+    matching_files = []
+    for path in mat_paths:
+        if day in path:
+            matching_files.append(path)
+    
+    
+    print(matching_files)
+
+    reg_dict = {}
+    for file in matching_files:
+        reg = mat73.loadmat(f"{reg_dir}/{file}")
+        dayi = file[:8]
+        dayj = file[9:-4]
+
+        reg = reg['cell_registered_struct']['cell_to_index_map']
+        
+        reg_list = []
+        # append every registered neuron (i.e. those greater than zero)
+        # counts the sum of registered neurons
+        for i in range(reg.shape[1]):
+            reg_list.append(reg[:, i] > 0)
+        cells_in_all = np.all(np.array(reg_list),axis=0)
+        print('no. registered cells: ', np.sum(cells_in_all))
+        
+
+        ind_list = []
+        for i in range(reg.shape[1]):
+            ind_list.append(reg[cells_in_all, i].astype(int)-1)#minus one because matlab using 1-indexing
+
+        dst_day = ""
+        print(day)
+        print(dayi)
+        print(dayj)
+        # The first row corresponds to this mouse
+        if dayi == day:
+            dst_day = dayj
+            print('here')
+        # The second row corresponds to this mouse... need to switch the rows
+        elif dayj == day:
+            dst_day = dayi
+            ind_list[0], ind_list[1] = ind_list[1], ind_list[0]
+
+        reg_dict[dst_day] = ind_list
+
+    return reg_dict
 
 
 def save_decoded_data(mouseID: str, day: str, scores: list[float]=None, preds: np.ndarray=None, model_type="general"):

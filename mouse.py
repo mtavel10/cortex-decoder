@@ -95,6 +95,9 @@ class MouseDay:
         
         self._interpolated_kin_avgs = self.interpolate_all("avg")
 
+        self._reg_dict = io.load_reg_dict(mouseID, day)
+
+
     @property
     def cal_tstamps(self) -> np.ndarray:
         """Get the calcium time series data."""
@@ -179,6 +182,10 @@ class MouseDay:
         Calcium probability estimation algorithm doesn't compute for the first and last 32 frames, so this is the number of valid timepoints of data
         """
         return self.cal_nframes - 64
+
+    @property
+    def reg_dict(self) -> dict[str, np.ndarray]:
+        return self._reg_dict
     
     # Number of frames varies per recording segment... should these even be properties?
     # Assumes the frames are uniform across cameras
@@ -396,6 +403,8 @@ class MouseDay:
         Each event frame indicates the "start" of a behavior, so it sets the subsequent 8 frames to that label (unless interrupted by another behavior)
         Handles "non-event" timepoints by setting the label to -1. 
         """
+
+        print("getting beh frames... ")
         max_beh_frames = 8
         # Counter variable tracks whether the frame is during a behavior (>0)
         beh_frame_count = 0
@@ -429,3 +438,9 @@ class MouseDay:
     
     def get_trimmed_beh_labels(self):
         return self.get_beh_labels()[32:-32]
+    
+
+
+if __name__ == "__main__":
+    test_mouse = MouseDay("mouse25", "20240425")
+    print(test_mouse.reg_dict)

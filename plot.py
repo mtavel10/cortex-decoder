@@ -13,7 +13,10 @@ import src.IO as io
 # TEMPORARY
 tseries_max = 4464
 N_PARTS = 14
-plt.rcParams.update({'font.size': 22}) # Sets the default font size to 12
+CROSS_CLASS_MODE = [("natural", "reach"), ("natural", "grasp"), ("natural", "carry"), ("learned", "non_movement"), ("learned", "fidget"), ("learned", "eating")]
+IN_CLASS_MODE = [("learned", "reach"), ("learned", "grasp"), ("learned", "carry"), ("natural", "non_movement"), ("natural", "fidget"), ("natural", "eating")]
+
+# plt.rcParams.update({'font.size': 22}) # Sets the default font size to 12
 behavior_model_types = ["reach", "grasp", "carry", "jumping", "fidget", "eating", "grooming", "no behavior", "general"]
 
 def plot_mouseday_data(mouse_day, event_key: str, figsize: Tuple[int, int] = (16, 10)):
@@ -591,7 +594,8 @@ def plot_model_performance(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10
 def plot_model_performance_swarm(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10)):
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
 
-    behaviors = mouse_day.BEHAVIOR_LABELS
+    # Shitty workaround until i fix the behavior labels in the mouseday class
+    behaviors = {key: value for key, value in mouse_day.BEHAVIOR_LABELS.items() if key != 6}
     model_types = list(behaviors.values()) + ["general"]
 
     x_positions = []
@@ -977,9 +981,6 @@ if __name__ == "__main__":
 
     # fig3 = plot_cell_performance(mouse_day)
     # plt.show()
-
-    CROSS_CLASS_MODE = [("natural", "reach"), ("natural", "grasp"), ("natural", "carry"), ("learned", "non_movement"), ("learned", "fidget"), ("learned", "eating")]
-    IN_CLASS_MODE = [("learned", "reach"), ("learned", "grasp"), ("learned", "carry"), ("natural", "non_movement"), ("natural", "fidget"), ("natural", "eating")]
 
     # fig4 = plot_performance(mouse_day, CROSS_CLASS_MODE, "Cross-class Testing")
     # fig5 = plot_performance(mouse_day, IN_CLASS_MODE, "In-Class Testing")

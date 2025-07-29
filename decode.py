@@ -12,7 +12,7 @@ import plot as myplot
 import matplotlib.pyplot as plt
 
 TEST_SIZE = .30 # 70/30 split duhhh
-BEH_CLASSES = {"all": [0, 1, 2, 3, 4, 5], "learned": [0, 1, 2], "natural": [3, 4, 5], "reach": [0], "grasp": [1], "carry": [2], "non_movement": [3], "fidget": [4], "eating": [5], "grooming": [6]}
+BEH_CLASSES = {"all": [0, 1, 2, 3, 4, 5], "learned": [0, 1, 2], "natural": [3, 4, 5], "reach": [0], "grasp": [1], "carry": [2], "non_movement": [3], "fidget": [4], "eating": [5]}
 LEARNED = ["reach", "grasp", "carry"]
 NATURAL = ["non_movement", "fidget", "eating"]
 
@@ -25,11 +25,9 @@ def decode_general(mouse_day: MouseDay, n_trials: int=10, save_res=False):
     X = mouse_day.get_trimmed_spks()
     y = mouse_day.get_trimmed_avg_locs()
     beh_per_frame = mouse_day.get_trimmed_beh_labels()
-    print(X)
-    print(y.shape)
-    print(beh_per_frame.shape)
     scores = []
     y_preds = []
+
     # Splitter object
     splitter = StratifiedKFold(n_splits=n_trials, shuffle=True, random_state=42)
 
@@ -75,7 +73,8 @@ def decode_behaviors(mouse_day: MouseDay, n_trials: int=10, save_res=False):
     X = mouse_day.get_trimmed_spks()
     y = mouse_day.get_trimmed_avg_locs()
     beh_per_frame = mouse_day.get_trimmed_beh_labels()
-    labels = mouse_day.BEHAVIOR_LABELS
+    # Shitty workaround until i fix the behavior labels in the mouseday class
+    labels = {key: value for key, value in mouse_day.BEHAVIOR_LABELS.items() if key != 6}
     all_preds = []
     all_scores = []
 
@@ -143,6 +142,7 @@ def decode_behaviors_with_general(mouse_day: MouseDay, ntrials: int=10, save_res
 
     # 1: need to hold out samples of each behavior
     behaviors = mouse_day.BEHAVIOR_LABELS
+    behaviors.pop(6) # excluding grooming
     for label in behaviors.keys():
         beh_frames = np.where(beh_per_frame == label)
         beh_X = X[beh_frames]
@@ -540,21 +540,41 @@ def dimensions_check(mouse_day: MouseDay):
     print("Untrimmed labels: ", len(test_labels))
     return 0
 
-def md_test(mouse_day: MouseDay, save_res=False):
+def md_run(mouse_day: MouseDay, save_status=False):
     """
     Just to make sure all the mice are mice-ing. 
-    Runs EVERYTHING. 
+    Runs EVERYTHING.
+    Saves if we specify. 
     """
-    # latency_check(mouse_day)
-    # dimensions_check(mouse_day)
+    latency_check(mouse_day)
+    dimensions_check(mouse_day)
 
-    # fig = myplot.plot_interp_test(mouse_day, mouse_day.seg_keys[0])
-    # plt.show()
+    fig = myplot.plot_interp_test(mouse_day, mouse_day.seg_keys[0])
+    plt.show()
 
-    s, p = decode_general(mouse_day, save_res=True)
-    s1, p1 = decode_behaviors(mouse_day, save_res=True)
+    decode_general(mouse_day, save_res=save_status)
     fig1 = myplot.plot_kin_predictions(mouse_day)
-    fig2 = myplot.plot_kin_predictions_by_model(mouse_day)
+
+    decode_behaviors(mouse_day, save_res=save_status)
+    fig2 = myplot.plot_model_performance_swarm(mouse_day)
+
+    decode_behaviors_with_general(mouse_day, save_res=save_status)
+    fig3 = myplot.plot_general_performance_by_beh(mouse_day)
+
+    decode_by_cell(mouse_day, save_res=save_status)
+    fig4 = myplot.plot_cell_performance_swarm(mouse_day)
+
+    for beh in LEARNED:
+        scores, preds = decode_behaviors_with_class(mouse_day, train_class=BEH_CLASSES["learned"], test_class=BEH_CLASSES[beh], mode="in_class", save_res=save_status)
+        scores1, preds1 = decode_behaviors_with_class(mouse_day, train_class=BEH_CLASSES["natural"], test_class=BEH_CLASSES[beh], mode="cross_class", save_res=save_status)
+
+    for beh in NATURAL:
+        scores, preds = decode_behaviors_with_class(mouse_day, train_class=BEH_CLASSES["natural"], test_class=BEH_CLASSES[beh], mode="in_class", save_res=save_status)
+        scores1, preds1 = decode_behaviors_with_class(mouse_day, train_class=BEH_CLASSES["learned"], test_class=BEH_CLASSES[beh], mode="cross_class", save_res=save_status)
+
+    fig5 = myplot.plot_performance_swarm(mouse_day, modes=myplot.IN_CLASS_MODE, mode_type="In-Class")
+    fig6 = myplot.plot_performance_swarm(mouse_day, modes=myplot.CROSS_CLASS_MODE, mode_type="Cross-Class")
+
     plt.show()
     return 0
 
@@ -564,19 +584,9 @@ if __name__ == "__main__":
     april25 = MouseDay(mouseID, "20240425")
     april24 = MouseDay(mouseID, "20240424")
 
-    md_test(april24)
+    md_run(april24, save_status=True)
+    
 
-
-
-    # for beh in LEARNED:
-    #     scores, preds = simple_decode_by_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=BEH_CLASSES[beh], mode="in_class")
-    #     print("score: ", np.mean(scores))
-    #     print()
-
-    # for beh in NATURAL:
-    #     scores, preds = simple_decode_by_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class=BEH_CLASSES[beh], mode="in_class")
-    #     print("score: ", np.mean(scores))
-    #     print()
 
         
     # all_beh_scores, all_beh_preds = ridge_by_beh(test_mouse)
