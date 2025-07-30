@@ -965,65 +965,49 @@ def plot_performance_swarm(mouse_day: MouseDay, modes: list[Tuple[str, str|None]
     plt.tight_layout()
     return fig
 
+def simple_crossday_performance(day1: MouseDay, day2: MouseDay, figsize=(16, 10)):
+    # def a way to do this dynamically with just a list of days
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
+    
+    d1_scores, d1_preds = io.load_decoded_data(day1.mouseID, day1.day, "registered_general")
+    d2_scores, d2_preds = io.load_decoded_data(day2.mouseID, day2.day, "registered_general")
+    d1xd2_scores, preds = io.load_decoded_data(day1.mouseID, day1.day, f"{day1.day}_x_{day2.day}")
+    d2xd1_scores, preds = io.load_decoded_data(day2.mouseID, day2.day, f"{day2.day}_x_{day1.day}")
+
+    cross_scores = [[np.mean(d1xd2_scores), np.mean(d2_scores)], 
+                    [np.mean(d1_scores), np.mean(d2xd1_scores)]]
+    
+    im = ax.imshow(cross_scores)
+
+    # Add axis labels
+    ax.set_ylabel('Test Day', fontsize=12)
+    ax.set_xlabel('Train Day', fontsize=12)
+    
+    # Add tick labels to make it clearer which day is which
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels([f'Day {day1.day}', f'Day {day2.day}'])
+    ax.set_yticks([0, 1])
+    ax.set_yticklabels([f'Day {day2.day}', f'Day {day1.day}'])
+    
+    # Add a colorbar for the scores
+    plt.colorbar(im, ax=ax, label='Mean Score')
+
+    # Set text to indicate scores
+    for i in range(0, 2):
+        for j in range(0, 2):
+            text = ax.text(j, i, cross_scores[i][j], ha="center", va="center", color="k")
+    
+    # Add title for clarity
+    ax.set_title(f'Cross-day Performance\nMouse {day1.mouseID}', fontsize=14)
+
+    return fig
+
+
 if __name__ == "__main__":
 
-    mouse_day = MouseDay('mouse25', '20240425')
-    event_keys = mouse_day.seg_keys
-    event_key = event_keys[0]  # Use first available key
-    
-    # # Plotting Ridge Regression results
-    # fig1 = plot_kin_predictions_simplified(mouse_day)
-    # plt.show()
-    
-    # # Plotting R2 scores by model
-    # fig2 = plot_model_performance(mouse_day)
-    # plt.show()
+    m25_april24 = MouseDay('mouse25', '20240424')
+    m25_april25 = MouseDay('mouse25', '20240425')
 
-    # fig3 = plot_cell_performance(mouse_day)
-    # plt.show()
-
-    # fig4 = plot_performance(mouse_day, CROSS_CLASS_MODE, "Cross-class Testing")
-    # fig5 = plot_performance(mouse_day, IN_CLASS_MODE, "In-Class Testing")
-    # plt.show()
-
-    # fig = plot_predictions_notrue(mouse_day)
-    # plt.show()
-
-    # fig2 = plot_spikes(mouse_day)
-    # plt.show()
-
-
-    # fig8 = plot_predictions(mouse_day, train_type="learned", test_type="carry")
-    # plt.show()
-
-
-    # Create comprehensive plot of mouseday data
-    # fig1 = plot_mouseday_data(mouse_day, event_key)
-    # plt.show()
-
-    # spkfig = plot_spikes(mouse_day)
-    # plt.show()
-
-    # scat = plot_performance_swarm(mouse_day, CROSS_CLASS_MODE, "Cross-Class Performance", figsize=(16, 7.5))
-    # scat2 = plot_performance_swarm(mouse_day, IN_CLASS_MODE, "In-Class Performance", figsize=(16, 7.5))
-    # scat3 = plot_cell_performance_swarm(mouse_day, figsize=(12, 10))
-    # plt.show()
-
-
-
-    fig1 = plot_kin_predictions(mouse_day)
-
-    fig2 = plot_kin_predictions_simplified(mouse_day)
-
-    fig3 = plot_kin_predictions_vertical(mouse_day)
-
+    simple_crossday_performance(m25_april24, m25_april25)
     plt.show()
-
-
-    # preds1 = plot_kin_predictions_by_model(mouse_day)
-    # plt.show()
-
-    # Test Interpolation function
-    # for key in event_keys:
-    #     fig4 = plot_interp_test(mouse_day, key)
-    #     plt.show()
+    

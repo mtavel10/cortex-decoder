@@ -379,13 +379,17 @@ class MouseDay:
         all_avg_locations = np.hstack([all_cam1, all_cam2])
         return all_avg_locations
 
-    def get_trimmed_spks(self) -> np.ndarray:
+    def get_trimmed_spks(self, reg_key: str=None) -> np.ndarray:
         """
         Returns a numpy array of size (n_timepoints x n_neurons)
         Represents the estimated spike probabilities across all timepoints
         """
-        trimmed_arr = self.cal_spks[:, 32:-32].T
-        return trimmed_arr
+        trimmed = self.cal_spks[:, 32:-32].T
+        if (reg_key):
+            registered_neurons = self.reg_dict[reg_key][0] # the columns we want to keep
+            trimmed = trimmed[:, registered_neurons]
+
+        return trimmed
 
     def get_trimmed_avg_locs(self):
         """
@@ -397,14 +401,12 @@ class MouseDay:
         return trimmed1
     
     
-    def get_beh_labels(self):
+    def get_beh_labels(self, reg_key: str=None):
         """ 
         Returns a 1D numpy array of behavior labels for all valid timepoints (calcium frames) for the day. 
         Each event frame indicates the "start" of a behavior, so it sets the subsequent 8 frames to that label (unless interrupted by another behavior)
         Handles "non-event" timepoints by setting the label to -1. 
         """
-
-        print("getting beh frames... ")
         max_beh_frames = 8
         # Counter variable tracks whether the frame is during a behavior (>0)
         beh_frame_count = 0
@@ -442,5 +444,5 @@ class MouseDay:
 
 
 if __name__ == "__main__":
-    test_mouse = MouseDay("mouse25", "20240425")
-    print(test_mouse.reg_dict)
+    test_mouse = MouseDay("mouse25", "20240424")
+    test_mouse.get_trimmed_spks(reg_key="20240425")

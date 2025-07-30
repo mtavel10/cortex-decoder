@@ -141,8 +141,8 @@ def decode_behaviors_with_general(mouse_day: MouseDay, ntrials: int=10, save_res
     test_sizes = []
 
     # 1: need to hold out samples of each behavior
-    behaviors = mouse_day.BEHAVIOR_LABELS
-    behaviors.pop(6) # excluding grooming
+    # Shitty workaround until i fix the behavior labels in the mouseday class
+    behaviors = {key: value for key, value in mouse_day.BEHAVIOR_LABELS.items() if key != 6}
     for label in behaviors.keys():
         beh_frames = np.where(beh_per_frame == label)
         beh_X = X[beh_frames]
@@ -514,6 +514,60 @@ def decode_behaviors_with_class(mouse_day: MouseDay, train_class: list[int], tes
         io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred_full, model_type=f"{train_class_type}_x_{test_class_type}")
        
     return scores, y_pred_full
+
+
+def decode_crossday_general(train_day: MouseDay, test_day: MouseDay, cross_test: bool=False, ntrials: int=10, save_res=False):
+    """
+    Decoding paw positions from the general population of REGISTERED neurons.
+    Model is trained on the train_day's registered neurons. 
+    If cross-test is true, we test on the test_day. Otherwise test on train_day's holdout. 
+    """
+    
+    X = train_day.get_trimmed_spks(reg_key=test_day.day)
+    y = train_day.get_trimmed_avg_locs()
+    beh_labels = train_day.get_trimmed_beh_labels()
+
+    if (cross_test):
+        X_cross_day = test_day.get_trimmed_spks(reg_key=train_day.day)
+        y_cross_day = test_day.get_trimmed_avg_locs()
+
+    scores = []
+
+    splitter = StratifiedShuffleSplit(n_splits=ntrials, test_size=TEST_SIZE, train_size=1-TEST_SIZE, random_state=42)
+    ridge = RidgeCV(alphas=[0.01, 0.1, 1, 10, 100, 1000], fit_intercept=True)
+
+    for i, (train_idcs, test_idcs) in enumerate(splitter.split(X, beh_labels)):
+        print("Fold: ", i)
+        X_train = X[train_idcs]
+        y_train = y[train_idcs]
+
+        if (cross_test):
+            X_test = X_cross_day[test_idcs]
+            y_test = y_cross_day[test_idcs]
+        else:
+            X_test = X[test_idcs]
+            y_test = y[test_idcs]
+
+        ridge.fit(X_train, y_train)
+
+        score = ridge.score(X_test, y_test)
+        scores.append(score)
+
+    if (cross_test):
+        y_preds = ridge.predict(X_cross_day)
+    else:
+        y_preds = ridge.predict(X)
+
+    if (save_res):
+        # SAVES WITHIN THE TRAIN DAY'S FOLDER
+        if (cross_test):
+            save_label = f"{train_day.day}_x_{test_day.day}"
+        else:
+            save_label = f"registered_general"
+        io.save_decoded_data(train_day.mouseID, train_day.day, scores, y_preds, save_label)
+        io.save_model(train_day.mouseID, train_day.day, ridge, save_label)
+
+    return scores, y_preds
       
 
 def latency_check(mouse_day: MouseDay):
@@ -584,35 +638,5 @@ if __name__ == "__main__":
     april25 = MouseDay(mouseID, "20240425")
     april24 = MouseDay(mouseID, "20240424")
 
-    md_run(april24, save_status=True)
-    
-
-
-        
-    # all_beh_scores, all_beh_preds = ridge_by_beh(test_mouse)
-    # print("all score: ", all_beh_scores)
-
-    # # testing on natural classes
-    # for beh in ["eating"]:
-    #     print()
-    #     print(f"(IN-CLASS) Natural model on {beh} data: ")
-    #     scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class = BEH_CLASSES[beh], mode="in_class")
-    #     print("scores: ", scores)
-
-    #     print()
-    #     print(f"(CROSS-CLASS) Learned model on {beh} data: ")
-    #     scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class = BEH_CLASSES[beh], mode="cross_class")
-    #     print("scores: ", scores)
-
-    # # testing on learned classes
-    # for beh in LEARNED:
-    #     print(f"(IN-CLASS) Learned model on {beh} data: ")
-    #     scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class = BEH_CLASSES[beh], mode="in_class")
-    #     print("scores: ", scores)
-
-    #     print(f"(CROSS-CLASS) Natural model on {beh} data: ")
-    #     scores, preds = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class = BEH_CLASSES[beh], mode="cross_class")
-    #     print("scores: ", scores)
-
-    # # s, p = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["natural"], test_class=BEH_CLASSES["learned"], mode="cross_class")
-    # # s1, p1 = decode_cross_beh_class(test_mouse, train_class=BEH_CLASSES["learned"], test_class=BEH_CLASSES["natural"], mode="cross_class")
+    # s, p = decode_crossday_general(train_day=april24, test_day=april25, cross_test=True, save_res=True)
+    # print("scores: ", s)

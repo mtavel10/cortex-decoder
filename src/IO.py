@@ -176,9 +176,6 @@ def load_reg_dict(mouseID, day) -> np.ndarray:
         if day in path:
             matching_files.append(path)
     
-    
-    print(matching_files)
-
     reg_dict = {}
     for file in matching_files:
         reg = mat73.loadmat(f"{reg_dir}/{file}")
@@ -193,21 +190,15 @@ def load_reg_dict(mouseID, day) -> np.ndarray:
         for i in range(reg.shape[1]):
             reg_list.append(reg[:, i] > 0)
         cells_in_all = np.all(np.array(reg_list),axis=0)
-        print('no. registered cells: ', np.sum(cells_in_all))
-        
 
         ind_list = []
         for i in range(reg.shape[1]):
             ind_list.append(reg[cells_in_all, i].astype(int)-1)#minus one because matlab using 1-indexing
 
         dst_day = ""
-        print(day)
-        print(dayi)
-        print(dayj)
         # The first row corresponds to this mouse
         if dayi == day:
             dst_day = dayj
-            print('here')
         # The second row corresponds to this mouse... need to switch the rows
         elif dayj == day:
             dst_day = dayi
