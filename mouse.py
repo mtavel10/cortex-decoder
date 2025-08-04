@@ -93,7 +93,7 @@ class MouseDay:
             df1, df2 = self._kin_dfs[key]  # Assuming load_kinematics_df returns a tuple of two dataframes
             self._kin_mats[key] = (self.create_kinematics_matrix(df1), self.create_kinematics_matrix(df2))
         
-        self._interpolated_kin_avgs = self.interpolate_all("avg")
+        # self._interpolated_kin_avgs = self.interpolate_all("avg")
 
         self._reg_dict = io.load_reg_dict(mouseID, day)
 
@@ -145,10 +145,34 @@ class MouseDay:
     def kin_mats(self) -> dict [str : tuple[np.ndarray, np.ndarray]]:
         """Get the first kinematic masked arrays list. Used more frequently for computations."""
         return self._kin_mats
+    
+    def check_bin_tstamp_alignment(self):
+        """
+        Looking into the number of bins vs tstamps per seg key across calcium and camera data
+        """
+        # print("MouseDay: ", self.mouseID, " ", self.day)
+        # calcium
+        print("Caclium Data Comparison")
+        for event_key in self.cal_tstamp_dict.keys():
+            num_cal_tstamps = self.cal_tstamp_dict[event_key].shape[0]
+            print(f"{event_key}: {num_cal_tstamps} tstamps")
+        
+        print("total cal tstamps: ", self.cal_ntimestamps)
+
+        print("total cal bins: ", self.cal_nframes)
+        print()
+
+        print("Kinematic Data Comparison")
+        for event_key in self.kin_tstamp_dict.keys(): 
+            num_kin_tstamps = self.get_kin_ntimeframes(event_key)
+            num_kin_bins = self.get_kin_nframes(event_key)
+            print(f"{event_key}: {num_kin_tstamps} tstamps, {num_kin_bins} data bins")
+        print()
+
 
     @property
     def cal_event_frames(self) -> np.ndarray:
-        """Get the calibration event times."""
+        """Get the calcium event times."""
         return self._cal_event_frames
     
     @property
@@ -169,11 +193,11 @@ class MouseDay:
     # Calcium camera frames differ from number of timestamps
     @property
     def cal_nframes(self) -> int:
-        return len(self.cal_spks[0])
+        return self.cal_spks[0].shape[0]
     
     @property
     def cal_ntimestamps(self) -> int:
-        return len(self.cal_tstamps)
+        return self.cal_tstamps.shape[0]
     
     @property
     def n_samples(self) -> int:
@@ -187,13 +211,13 @@ class MouseDay:
     def reg_dict(self) -> dict[str, np.ndarray]:
         return self._reg_dict
     
-    # Number of frames varies per recording segment... should these even be properties?
+    # Number of frames varies per recording segment
     # Assumes the frames are uniform across cameras
     def get_kin_nframes(self, key) -> int:
         return len(self.kin_mats[key][0][0])
     
     def get_kin_ntimeframes(self, key) -> int:
-        return len(self.kin_tstamp_dict[key])
+        return self.kin_tstamp_dict[key].shape[0]
 
     def get_trimmed_cal_tstamps(self) -> np.ndarray:
         return self.cal_tstamps[32:-32]
@@ -267,8 +291,8 @@ class MouseDay:
         # Shape: (n_bodyparts, n_timepoints)
         return kinematics_matrix[self.N_PARTS:, :]
 
-    # Helper function for interpolating
 
+    # Helper function for interpolating
     def get_avg_coordinates(self, kinematics_matrix) -> np.ndarray:
         """
         Collapses the locations of each bodypart into an "average" location.
@@ -332,9 +356,12 @@ class MouseDay:
             
             # Resizing the kinematics-camera frames to match the kinematics time series
             max_frames = min(self.get_kin_ntimeframes(key), self.get_kin_nframes(key))
+            # print(self.get_kin_nframes(key))
+            # print(self.get_kin_ntimeframes(key))
             x_avg = x_avg[:max_frames]
             y_avg = y_avg[:max_frames]
             cam_tstamps = curr_kin_tstamps[:max_frames]
+
             # Interpolate!
             x_avg_interp = np.interp(curr_cal_tstamps, cam_tstamps, x_avg)
             y_avg_interp = np.interp(curr_cal_tstamps, cam_tstamps, y_avg)
@@ -346,7 +373,7 @@ class MouseDay:
         return tuple(avg_interps)
     
     
-    def interpolate_all(self, features : str) -> dict[str : tuple[np.ndarray, np.ndarray]]:
+    def interpolate_all(self, features : str="avg") -> dict[str : tuple[np.ndarray, np.ndarray]]:
         kin_avg_interp = {}
         for seg in self.seg_keys:
             if features == "avg":
@@ -444,5 +471,28 @@ class MouseDay:
 
 
 if __name__ == "__main__":
-    test_mouse = MouseDay("mouse25", "20240424")
-    test_mouse.get_trimmed_spks(reg_key="20240425")
+    mouse_day = MouseDay("mouse25", "20240422")
+    print("here")
+    mouse_day.check_bin_tstamp_alignment()
+
+    # test_locs = mouse_day.get_trimmed_avg_locs()
+    # test_spikes = mouse_day.get_trimmed_spks()
+    # test_labels = mouse_day.get_trimmed_beh_labels()
+
+    # test_untrimmedlocs = mouse_day.get_all_avg_locations()
+    # test_untrimmedspks = mouse_day.cal_spks.T
+    # test_untrimmed_labels = mouse_day.get_beh_labels()
+
+    # print("No Trim Locs: ", test_untrimmedlocs.shape)
+    # print("No Trim Spikes: ", test_untrimmedspks.shape)
+    # print("No Trim Labels: ", len(test_untrimmed_labels))
+
+    # print("Trimmed Locs: ", test_locs.shape)
+    # print("Trimmed Spikes: ", test_spikes.shape)
+    # print("Trimmed labels: ", len(test_labels))
+
+    # print("------------")
+    # print()
+    # print("# of timestamps (calcium): ", mouse_day.cal_ntimestamps)
+    # print("# of datapoints (calcium): ", mouse_day.cal_nframes)
+    # mouse_day.check_caltime_latency()

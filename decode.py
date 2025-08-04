@@ -568,6 +568,7 @@ def decode_crossday_general(train_day: MouseDay, test_day: MouseDay, cross_test:
         io.save_model(train_day.mouseID, train_day.day, ridge, save_label)
 
     return scores, y_preds
+
       
 
 def latency_check(mouse_day: MouseDay):
@@ -579,19 +580,20 @@ def latency_check(mouse_day: MouseDay):
 def dimensions_check(mouse_day: MouseDay):
     # Go back and figure out how the lengths differ...and why this func takes a hot sec
     test_locs = mouse_day.get_trimmed_avg_locs()
-    test_untrimmedlocs = mouse_day.get_all_avg_locations()
     test_spikes = mouse_day.get_trimmed_spks()
     test_labels = mouse_day.get_trimmed_beh_labels()
+
+    test_untrimmedlocs = mouse_day.get_all_avg_locations()
+    test_untrimmedspks = mouse_day.cal_spks.T
     test_untrimmed_labels = mouse_day.get_beh_labels()
 
     print("No Trim Locs: ", test_untrimmedlocs.shape)
-    print("No Trim Spikes: ", mouse_day.cal_spks.T.shape)
+    print("No Trim Spikes: ", test_untrimmedspks.shape)
     print("No Trim Labels: ", len(test_untrimmed_labels))
 
     print("Trimmed Locs: ", test_locs.shape)
     print("Trimmed Spikes: ", test_spikes.shape)
-
-    print("Untrimmed labels: ", len(test_labels))
+    print("Trimmed labels: ", len(test_labels))
     return 0
 
 def md_run(mouse_day: MouseDay, save_status=False):
@@ -634,9 +636,28 @@ def md_run(mouse_day: MouseDay, save_status=False):
 
 
 if __name__ == "__main__":
-    mouseID = "mouse25"
-    april25 = MouseDay(mouseID, "20240425")
-    april24 = MouseDay(mouseID, "20240424")
 
-    # s, p = decode_crossday_general(train_day=april24, test_day=april25, cross_test=True, save_res=True)
-    # print("scores: ", s)
+    mouseIDs = ['mouse25']
+    days = ['20240420', '20240421', '20240422', '20240423', '20240424', '20240425', '20240428', '20240429', '20240430', '20240501' ,'20240502', '20240503']
+    
+    mouse_days = []
+    for mouseID in mouseIDs:
+        for day in days: 
+            if day == '20240502':
+                print()
+                print("----------------------")
+                print("day", day, "...")
+                curr_mouse_day = MouseDay(mouseID, day)
+                curr_mouse_day.check_bin_tstamp_alignment()
+            # if day != '20240425' and day != '20240424':
+            #     md_run(curr_mouse_day, save_status=True)
+
+            # for cross_day in days:
+            #     cross_mouse_day = MouseDay(mouseID, cross_day)
+            #     if day != cross_day:
+            #         s, p = decode_crossday_general(train_day=curr_mouse_day, test_day=cross_mouse_day, cross_test=True, save_res=True)
+            #         print(f"{day} x {cross_day} scores: ", s)
+            #     else:
+            #         # just train a general model on the day's registered neurons
+            #         s, p = decode_crossday_general(train_day=curr_mouse_day, test_day=cross_mouse_day, cross_test=False, save_res=True)
+            #         print(f"{day}'s registered neuron scores: ", s)

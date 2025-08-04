@@ -596,7 +596,9 @@ def plot_model_performance_swarm(mouse_day: MouseDay, figsize: Tuple[int, int]=(
 
     # Shitty workaround until i fix the behavior labels in the mouseday class
     behaviors = {key: value for key, value in mouse_day.BEHAVIOR_LABELS.items() if key != 6}
-    model_types = list(behaviors.values()) + ["general"]
+    model_types = list(behaviors.values())
+    model_types.remove('grooming')
+    model_types.append('general')
 
     x_positions = []
     all_scores = []
@@ -634,13 +636,15 @@ def plot_model_performance_swarm(mouse_day: MouseDay, figsize: Tuple[int, int]=(
 def plot_general_performance_by_beh(mouse_day: MouseDay, figsize: Tuple[int, int]=(16,10)):
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
     scores_by_beh = io.load_scores_by_beh(mouse_day.mouseID, mouse_day.day)
+    behaviors = list(mouse_day.BEHAVIOR_LABELS.values())
+    behaviors.remove('grooming')
     
     # Calculate means and standard deviations for behavior scores
     means = [np.mean(scores) for scores in scores_by_beh.values()]
     stds = [np.std(scores) for scores in scores_by_beh.values()]
 
     # Create bar plot with error bars
-    bars = ax.bar(mouse_day.BEHAVIOR_LABELS.values(), means, yerr=stds, capsize=5, alpha=0.7, 
+    bars = ax.bar(behaviors, means, yerr=stds, capsize=5, alpha=0.7, 
                   color=['skyblue'])
     
     # Customize the plot
@@ -693,6 +697,7 @@ def plot_cell_performance(mouse_day: MouseDay, figsize: Tuple[int, int]=(16, 10)
     
     plt.tight_layout()
     return fig
+
 
 def plot_cell_performance_swarm(mouse_day: MouseDay, figsize: Tuple[int, int]=(10, 10)):
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
@@ -1002,6 +1007,23 @@ def simple_crossday_performance(day1: MouseDay, day2: MouseDay, figsize=(16, 10)
 
     return fig
 
+def plot_decoded_data(mouse_day: MouseDay):
+    """
+    Just to make sure all the mice are mice-ing. 
+    Runs EVERYTHING.
+    Saves if we specify. 
+    """
+
+    fig = plot_interp_test(mouse_day, mouse_day.seg_keys[0])
+    fig1 = plot_kin_predictions(mouse_day)
+    fig2 = plot_model_performance_swarm(mouse_day)
+    fig3 = plot_general_performance_by_beh(mouse_day)
+    fig4 = plot_cell_performance_swarm(mouse_day)
+    fig5 = plot_performance_swarm(mouse_day, modes=IN_CLASS_MODE, mode_type="In-Class")
+    fig6 = plot_performance_swarm(mouse_day, modes=CROSS_CLASS_MODE, mode_type="Cross-Class")
+
+    plt.show()
+    return 0
 
 if __name__ == "__main__":
 
