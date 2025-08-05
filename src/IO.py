@@ -18,7 +18,7 @@ def save_pickle(filepath, obj):
         pickle.dump(obj, file)
 
 
-def get_drive(mouseID):
+def get_drive(mouseID=None):
     cwd = os.getcwd()
     return cwd
 
@@ -246,3 +246,25 @@ def load_model(mouseID: str, day: str, model_type="general") -> any:
     file_path = f"{get_drive(mouseID)}/decoded_data/{mouseID}/{day}/{model_type}_model.pkl"
     model_obj = load_pickle(file_path)
     return model_obj
+
+def save_interpolated_kinematics(mouseID: str, day: str, data: dict[str: [np.ndarray, np.ndarray]], kin_dtype: str="avg"):
+    """
+    Saves a dictionary of kinematic locations for one day, interpolated so that every time bin aligns with the calcium data's frequency. 
+    Parameters
+        data
+            key = segment key (denotes the recording segment within this day)
+            values = two numpy arrays, one per camera view
+        kin_dtype
+            "avg" is the default - just to name the file based on whether the data is averaged across all keypoints
+    """
+    file_path = f"{get_drive()}/interpolated_kinematic_data"
+    file_name = f"{mouseID}_{day}_interpolated_{kin_dtype}.pkl"
+    os.makedirs(file_path, mode=0o777, exist_ok=True)
+    save_pickle(f"{file_path}/{file_name}", data)
+    return file_path
+
+def load_interpolated_kinematics(mouseID: str, day: str, kin_dtype: str="avg"):
+    file_path = f"{get_drive()}/interpolated_kinematic_data"
+    file_name = f"{mouseID}_{day}_interpolated_{kin_dtype}.pkl"
+    data = load_pickle(f"{file_path}/{file_name}")
+    return data

@@ -25,6 +25,11 @@ def decode_general(mouse_day: MouseDay, n_trials: int=10, save_res=False):
     X = mouse_day.get_trimmed_spks()
     y = mouse_day.get_trimmed_avg_locs()
     beh_per_frame = mouse_day.get_trimmed_beh_labels()
+
+    print("X: ", X.shape)
+    print("y: ", y.shape)
+    print("behaviors per frame: ", len(beh_per_frame))
+
     scores = []
     y_preds = []
 
@@ -131,8 +136,6 @@ def decode_behaviors_with_general(mouse_day: MouseDay, ntrials: int=10, save_res
     X_beh_test: dict[int, np.ndarray] = {}
     y_beh_test: dict[int, np.ndarray] = {}
 
-    print(X.shape)
-    print(y.shape)
     X_gen = np.zeros((1, X.shape[1]))
     y_gen = np.zeros((1, y.shape[1]))
     beh_per_frame_gen = []
@@ -143,6 +146,7 @@ def decode_behaviors_with_general(mouse_day: MouseDay, ntrials: int=10, save_res
     # 1: need to hold out samples of each behavior
     # Shitty workaround until i fix the behavior labels in the mouseday class
     behaviors = {key: value for key, value in mouse_day.BEHAVIOR_LABELS.items() if key != 6}
+    
     for label in behaviors.keys():
         beh_frames = np.where(beh_per_frame == label)
         beh_X = X[beh_frames]
@@ -211,6 +215,102 @@ def decode_behaviors_with_general(mouse_day: MouseDay, ntrials: int=10, save_res
     io.save_scores_by_beh(mouse_day.mouseID, mouse_day.day, scores_by_beh)
 
     return scores_by_beh
+
+
+def decode_behaviors_with_generalBALANCED(mouse_day: MouseDay, ntrials: int=10, save_res=False):
+    """
+    Decodes specific behavior samples using a model trained on the general population. 
+        Train: General, Test: By Behavior
+    """
+    X = mouse_day.get_trimmed_spks()
+    y = mouse_day.get_trimmed_avg_locs()
+    beh_per_frame = mouse_day.get_trimmed_beh_labels()
+
+    # Holding testing data by behavior
+    X_beh_test: dict[int, np.ndarray] = {}
+    y_beh_test: dict[int, np.ndarray] = {}
+
+    X_gen = np.zeros((1, X.shape[1]))
+    y_gen = np.zeros((1, y.shape[1]))
+    beh_per_frame_gen = []
+
+    # need to limit the size of testing samples later on
+    test_sizes = []
+
+    # 1: need to hold out samples of each behavior
+    # Shitty workaround until i fix the behavior labels in the mouseday class
+    behaviors = {key: value for key, value in mouse_day.BEHAVIOR_LABELS.items() if key != 6}
+    
+    for label in behaviors.keys():
+        beh_frames = np.where(beh_per_frame == label)
+        beh_X = X[beh_frames]
+        beh_y = y[beh_frames]
+        
+        indices = np.arange(len(beh_X))
+        np.random.shuffle(indices)
+        beh_X = beh_X[indices]
+        beh_y = beh_y[indices]
+
+        # 70/30 split: 70% of these samples will go towards training the general model, the 30% will be tested on
+        # vibes based we can see how performance changes if we adjust this split
+        holdout_idx = int(.3 * len(beh_X))
+        holdout_X, holdout_y = beh_X[:holdout_idx], beh_y[:holdout_idx]
+        using_X, using_y = beh_X[holdout_idx:], beh_y[holdout_idx:]
+
+        test_sizes.append(len(holdout_X))
+
+        X_beh_test[label] = holdout_X
+        y_beh_test[label] = holdout_y
+        
+        beh_per_frame_gen += [label] * len(using_y)
+    
+        X_gen = np.vstack((X_gen, using_X))
+        y_gen = np.vstack((y_gen, using_y))
+
+    X_gen = X_gen[1:]
+    y_gen = y_gen[1:]
+    
+    min_test_size = 157
+    print(test_sizes)
+    print(min_test_size)
+
+    # 2: train a model
+    scores_by_beh: dict[int, list[float]] = {}
+    for label in behaviors.keys():
+        scores_by_beh[label] = []
+
+    splitter = StratifiedKFold(n_splits=ntrials, shuffle=True, random_state=42)
+    for i, (train_idcs, test_idcs) in enumerate(splitter.split(X_gen, beh_per_frame_gen)):
+        print("Training Split: ", i)
+        X_train = X_gen[train_idcs]
+        y_train = y_gen[train_idcs]
+        
+        # Cross-validate to find the best alpha
+        ridge = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0], fit_intercept=True)
+
+        # Train the model
+        ridge.fit(X_train, y_train)
+
+        # Evaluate fold model performance and predict on each behavior data
+        for label in X_beh_test.keys():
+            X_test = X_beh_test[label]
+            y_test = y_beh_test[label]
+
+            # make sure all the test data samples are the same across behaviors
+            indices = np.arange(len(X_test))
+            np.random.shuffle(indices)
+            X_test, y_test = X_test[indices], y_test[indices]
+            X_test, y_test = X_test[:min_test_size], y_test[:min_test_size]
+
+            trial_scores = ridge.score(X_test, y_test)
+            print(f"General Model Score on {behaviors[label]} data: ", trial_scores)
+            scores_by_beh[label].append(trial_scores)# 10 scores per behavior (10 folds)
+            
+    io.save_scores_by_beh(mouse_day.mouseID, mouse_day.day, scores_by_beh)
+
+    return scores_by_beh
+
+
 
 def decode_by_cell(mouse_day: MouseDay, ntrials: int=10, save_res=False):
     """
@@ -602,8 +702,8 @@ def md_run(mouse_day: MouseDay, save_status=False):
     Runs EVERYTHING.
     Saves if we specify. 
     """
-    latency_check(mouse_day)
-    dimensions_check(mouse_day)
+    # latency_check(mouse_day)
+    # dimensions_check(mouse_day)
 
     fig = myplot.plot_interp_test(mouse_day, mouse_day.seg_keys[0])
     plt.show()
@@ -612,13 +712,13 @@ def md_run(mouse_day: MouseDay, save_status=False):
     fig1 = myplot.plot_kin_predictions(mouse_day)
 
     decode_behaviors(mouse_day, save_res=save_status)
-    fig2 = myplot.plot_model_performance_swarm(mouse_day)
+    # fig2 = myplot.plot_model_performance_swarm(mouse_day)
 
     decode_behaviors_with_general(mouse_day, save_res=save_status)
-    fig3 = myplot.plot_general_performance_by_beh(mouse_day)
+    # fig3 = myplot.plot_general_performance_by_beh(mouse_day)
 
     decode_by_cell(mouse_day, save_res=save_status)
-    fig4 = myplot.plot_cell_performance_swarm(mouse_day)
+    # fig4 = myplot.plot_cell_performance_swarm(mouse_day)
 
     for beh in LEARNED:
         scores, preds = decode_behaviors_with_class(mouse_day, train_class=BEH_CLASSES["learned"], test_class=BEH_CLASSES[beh], mode="in_class", save_res=save_status)
@@ -628,10 +728,10 @@ def md_run(mouse_day: MouseDay, save_status=False):
         scores, preds = decode_behaviors_with_class(mouse_day, train_class=BEH_CLASSES["natural"], test_class=BEH_CLASSES[beh], mode="in_class", save_res=save_status)
         scores1, preds1 = decode_behaviors_with_class(mouse_day, train_class=BEH_CLASSES["learned"], test_class=BEH_CLASSES[beh], mode="cross_class", save_res=save_status)
 
-    fig5 = myplot.plot_performance_swarm(mouse_day, modes=myplot.IN_CLASS_MODE, mode_type="In-Class")
-    fig6 = myplot.plot_performance_swarm(mouse_day, modes=myplot.CROSS_CLASS_MODE, mode_type="Cross-Class")
+    # fig5 = myplot.plot_performance_swarm(mouse_day, modes=myplot.IN_CLASS_MODE, mode_type="In-Class")
+    # fig6 = myplot.plot_performance_swarm(mouse_day, modes=myplot.CROSS_CLASS_MODE, mode_type="Cross-Class")
 
-    plt.show()
+    # plt.show()
     return 0
 
 
@@ -640,20 +740,30 @@ if __name__ == "__main__":
     mouseIDs = ['mouse25']
     days = ['20240420', '20240421', '20240422', '20240423', '20240424', '20240425', '20240428', '20240429', '20240430', '20240501' ,'20240502', '20240503']
     
-    mouse_days = []
-    for mouseID in mouseIDs:
-        for day in days: 
-            if day == '20240502':
-                print()
-                print("----------------------")
-                print("day", day, "...")
-                curr_mouse_day = MouseDay(mouseID, day)
-                curr_mouse_day.check_bin_tstamp_alignment()
+    test_md = MouseDay("mouse25", "20240425")
+    s, p = decode_behaviors_with_general(test_md, save_res=False)
+
+
+    # Cross Day Decoding!
+    # mouse_days = []
+    # for mouseID in mouseIDs:
+    #     for day in days: 
+    #         if day == '20240422':
+    #             print()
+    #             print("----------------------")
+    #             print("day", day, "...")
+    #             curr_mouse_day = MouseDay(mouseID, day)
+    #             curr_mouse_day.check_bin_tstamp_alignment()
+    #             dimensions_check(curr_mouse_day)
+    #             s, p = decode_general(curr_mouse_day)
+            # myplot.plot_decoded_data(curr_mouse_day)
+
             # if day != '20240425' and day != '20240424':
             #     md_run(curr_mouse_day, save_status=True)
 
             # for cross_day in days:
             #     cross_mouse_day = MouseDay(mouseID, cross_day)
+
             #     if day != cross_day:
             #         s, p = decode_crossday_general(train_day=curr_mouse_day, test_day=cross_mouse_day, cross_test=True, save_res=True)
             #         print(f"{day} x {cross_day} scores: ", s)

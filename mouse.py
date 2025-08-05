@@ -64,7 +64,7 @@ class MouseDay:
     CUTOFF = 0.4
     BEHAVIOR_LABELS = {0: 'reach', 1: 'grasp', 2: 'carry', 3: 'non_movement_or_kept_jumping', 4: 'fidget', 5: 'eating', 6: 'grooming', -1: 'non_behavior_event'}
 
-    def __init__(self, mouseID, day):
+    def __init__(self, mouseID, day, register_cells=False):
         self.mouseID : str = mouseID
         self.day : str = day                
 
@@ -93,9 +93,10 @@ class MouseDay:
             df1, df2 = self._kin_dfs[key]  # Assuming load_kinematics_df returns a tuple of two dataframes
             self._kin_mats[key] = (self.create_kinematics_matrix(df1), self.create_kinematics_matrix(df2))
         
-        # self._interpolated_kin_avgs = self.interpolate_all("avg")
+        self._interpolated_kin_avgs = self.interpolate_all("avg")
 
-        self._reg_dict = io.load_reg_dict(mouseID, day)
+        if (register_cells):
+            self._reg_dict = io.load_reg_dict(mouseID, day)
 
 
     @property
@@ -166,7 +167,8 @@ class MouseDay:
         for event_key in self.kin_tstamp_dict.keys(): 
             num_kin_tstamps = self.get_kin_ntimeframes(event_key)
             num_kin_bins = self.get_kin_nframes(event_key)
-            print(f"{event_key}: {num_kin_tstamps} tstamps, {num_kin_bins} data bins")
+            print(f"{event_key}: {num_kin_tstamps} tstamps")
+            print(f"number of kin bins = (1) {len(self._kin_mats[event_key][0][0])}, (2) {len(self._kin_mats[event_key][1][0])}")
         print()
 
 
@@ -214,12 +216,13 @@ class MouseDay:
     # Number of frames varies per recording segment
     # Assumes the frames are uniform across cameras
     def get_kin_nframes(self, key) -> int:
-        return len(self.kin_mats[key][0][0])
+        return min(len(self.kin_mats[key][0][0]), len(self.kin_mats[key][1][0]))
     
     def get_kin_ntimeframes(self, key) -> int:
         return self.kin_tstamp_dict[key].shape[0]
 
     def get_trimmed_cal_tstamps(self) -> np.ndarray:
+
         return self.cal_tstamps[32:-32]
 
     # Not in use, changed the list of boydparts to a static variable
@@ -356,8 +359,7 @@ class MouseDay:
             
             # Resizing the kinematics-camera frames to match the kinematics time series
             max_frames = min(self.get_kin_ntimeframes(key), self.get_kin_nframes(key))
-            # print(self.get_kin_nframes(key))
-            # print(self.get_kin_ntimeframes(key))
+
             x_avg = x_avg[:max_frames]
             y_avg = y_avg[:max_frames]
             cam_tstamps = curr_kin_tstamps[:max_frames]
@@ -374,13 +376,14 @@ class MouseDay:
     
     
     def interpolate_all(self, features : str="avg") -> dict[str : tuple[np.ndarray, np.ndarray]]:
+        """
+        Interpolates all recording segments for the save, eturns a dictionary by segment key. 
+        """
         kin_avg_interp = {}
         for seg in self.seg_keys:
             if features == "avg":
                 kin_avg_interp[seg] = self.interpolate_avgkin2cal(seg)
-        
-        # print(kin_avg_interp)
-        # np.save("{mouseID}/interpolated_avgs.npy", kin_avg_interp)
+    
         return kin_avg_interp
     
     def get_all_avg_locations(self):
