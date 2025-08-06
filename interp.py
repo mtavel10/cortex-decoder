@@ -64,8 +64,15 @@ Make sure you have all the required python packages installed.
 type into the terminal: python3 interp.py
 """
 
+def multiday_interpolate_and_save(mouseID: str, days: list[str]):
+    for day in days:
+        mouse_day = MouseDay(mouseID, day)
+        interpolated_locs = mouse_day.interpolate_all("avg")
+        path = io.save_interpolated_kinematics(mouseID, day, interpolated_locs)
+        print("Saved to", path)
+    return 0
 
-if __name__ == "__main__":
+def example_use():
     # Constructs a MouseDay object for mouse25 on april 25th, 2024
     mouseID: str = "mouse25"
     day: str = "20240425"
@@ -90,7 +97,6 @@ if __name__ == "__main__":
         print(" y: ", data[1][1])
     print("----------------")
 
-
     # Saves the dictionary to a folder called "interpolated kinematic data". Creates the folder if it doesn't already exist. 
     path: str = io.save_interpolated_kinematics(mouseID, day, interpolated_kinematics_dict, kin_dtype="avg")
     print(f"Successfully saved data to {path}!")
@@ -98,3 +104,9 @@ if __name__ == "__main__":
 
     # To load in that data back for whatever reason (this would be done outside of this file, assuming you JUST have the interpolated kinematic files and not the mouseDay class)
     new_dict: dict[str: [np.ndarray, np.ndarray]] = io.load_interpolated_kinematics(mouseID, day, kin_dtype="avg")
+
+if __name__ == "__main__":
+    mouseID = 'mouse25'
+    days = ['20240420', '20240421', '20240422', '20240423', '20240424', '20240425', '20240428', '20240429', '20240430', '20240501' ,'20240502', '20240503']
+
+    multiday_interpolate_and_save(mouseID, days)

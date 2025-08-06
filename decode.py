@@ -6,7 +6,7 @@ import math
 from mouse import MouseDay
 from typing import Optional, Tuple
 from sklearn.model_selection import StratifiedKFold, KFold, StratifiedShuffleSplit
-from sklearn.linear_model import Ridge, RidgeCV, LinearRegression
+from sklearn.linear_model import RidgeCV, LassoCV, MultiTaskLassoCV
 from sklearn.metrics import r2_score
 import plot as myplot
 import matplotlib.pyplot as plt
@@ -17,7 +17,7 @@ LEARNED = ["reach", "grasp", "carry"]
 NATURAL = ["non_movement", "fidget", "eating"]
 
 
-def decode_general(mouse_day: MouseDay, n_trials: int=10, save_res=False):
+def decode_general(mouse_day: MouseDay, model_name="ridge", n_trials: int=10, save_res=False):
     """
     Decodes all the samples across the entire population of neurons. 
         Train: General, Test: General
@@ -37,7 +37,11 @@ def decode_general(mouse_day: MouseDay, n_trials: int=10, save_res=False):
     splitter = StratifiedKFold(n_splits=n_trials, shuffle=True, random_state=42)
 
     # Cross-validate to find the best alpha
-    ridge = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0], fit_intercept=True)
+    model = ""
+    if (model_name == "lasso"):
+        model = MultiTaskLassoCV(alphas=[0.1, 1.0, 10.0, 100.0])
+    else: # default to ridge # change this later to default to LS
+        model = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0])
     
     # splitter.split() randomly generates test/training indices for X based on a stratifier (the beh labels)
     # Loops n_splits times
@@ -47,13 +51,13 @@ def decode_general(mouse_day: MouseDay, n_trials: int=10, save_res=False):
         y_train, y_test = y[train_idcs], y[test_idcs]
 
         # Train the model
-        ridge.fit(X_train, y_train)
+        model.fit(X_train, y_train)
 
         # Evaluate based on R^2
-        scores.append(ridge.score(X_test, y_test))
+        scores.append(model.score(X_test, y_test))
 
         # Only predict on test data for this fold
-        y_pred_fold = ridge.predict(X_test)
+        y_pred_fold = model.predict(X_test)
         y_preds.append((test_idcs, y_pred_fold))
     
     # Reconstruct full predictions
@@ -63,14 +67,14 @@ def decode_general(mouse_day: MouseDay, n_trials: int=10, save_res=False):
     
     if (save_res):
         # saves the scores and predictions for plotting
-        io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type="general")
+        io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type=f"general_{model_name}")
         # saves the last training iteration just in case
-        io.save_model(mouse_day.mouseID, mouse_day.day, ridge)
+        io.save_model(mouse_day.mouseID, mouse_day.day, model, model_type=f"general_{model_name}")
 
     return scores, y_pred
 
 
-def decode_behaviors(mouse_day: MouseDay, n_trials: int=10, save_res=False):
+def decode_behaviors(mouse_day: MouseDay, model_name="ridge", n_trials: int=10, save_res=False):
     """
     Decodes behaviors with models trained on that specific behavior. 
         Train: By Behavior, Test: By Behavior
@@ -92,7 +96,11 @@ def decode_behaviors(mouse_day: MouseDay, n_trials: int=10, save_res=False):
         y_preds = []
 
         # CV to find best alpha
-        ridge = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0], fit_intercept=True)
+        model = 0
+        if (model_name=="lasso"):
+            model = MultiTaskLassoCV(alphas=[0.1, 1.0, 10.0, 100.0])
+        else:
+            model = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0])
         
         # KFold CV on the current behavior's data
         splitter = KFold(n_splits=n_trials, shuffle=True, random_state=42)
@@ -102,23 +110,23 @@ def decode_behaviors(mouse_day: MouseDay, n_trials: int=10, save_res=False):
             y_train, y_test = curr_y[train_idcs], curr_y[test_idcs]
 
             # Train the model
-            ridge.fit(X_train, y_train)
+            model.fit(X_train, y_train)
 
             # Evaluate based on R^2
-            trial_score = ridge.score(X_test, y_test)
+            trial_score = model.score(X_test, y_test)
             scores.append(trial_score)
 
         # Make an overall prediction on all data using the last iteration of this behavior model
         # Not that precise of a location prediction but pred data more for sanity check than anything
-        y_pred = ridge.predict(X)
+        y_pred = model.predict(X)
 
         all_preds.append(y_pred)
         all_scores.append(scores)
         print("scores: ", scores)
 
         if (save_res):
-            io.save_model(mouse_day.mouseID, mouse_day.day, ridge, labels[label])
-            io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type=labels[label])
+            io.save_model(mouse_day.mouseID, mouse_day.day, model, model_type=f"{labels[label]}_{model_name}")
+            io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type=f"{labels[label]}_{model_name}")
 
     return all_scores, y_preds
 
@@ -217,97 +225,104 @@ def decode_behaviors_with_general(mouse_day: MouseDay, ntrials: int=10, save_res
     return scores_by_beh
 
 
-def decode_behaviors_with_generalBALANCED(mouse_day: MouseDay, ntrials: int=10, save_res=False):
+def decode_behaviors_with_generalBAL(mouse_day: MouseDay, ntrials: int=10, save_res=False):
     """
     Decodes specific behavior samples using a model trained on the general population. 
         Train: General, Test: By Behavior
     """
-    X = mouse_day.get_trimmed_spks()
-    y = mouse_day.get_trimmed_avg_locs()
-    beh_per_frame = mouse_day.get_trimmed_beh_labels()
+    spikes = mouse_day.get_trimmed_spks()
+    locs = mouse_day.get_trimmed_avg_locs()
+    beh_per_bin = mouse_day.get_trimmed_beh_labels()
 
-    # Holding testing data by behavior
-    X_beh_test: dict[int, np.ndarray] = {}
-    y_beh_test: dict[int, np.ndarray] = {}
-
-    X_gen = np.zeros((1, X.shape[1]))
-    y_gen = np.zeros((1, y.shape[1]))
-    beh_per_frame_gen = []
-
-    # need to limit the size of testing samples later on
-    test_sizes = []
-
-    # 1: need to hold out samples of each behavior
+    # 1: need to organize the samples by behavior for splitting later on
     # Shitty workaround until i fix the behavior labels in the mouseday class
     behaviors = {key: value for key, value in mouse_day.BEHAVIOR_LABELS.items() if key != 6}
     
-    for label in behaviors.keys():
-        beh_frames = np.where(beh_per_frame == label)
-        beh_X = X[beh_frames]
-        beh_y = y[beh_frames]
-        
-        indices = np.arange(len(beh_X))
-        np.random.shuffle(indices)
-        beh_X = beh_X[indices]
-        beh_y = beh_y[indices]
+    spikes_by_beh = []
+    locs_by_beh = []
+    bins_by_beh = []
+    all_sample_sizes = []
+    for i, behavior in enumerate(behaviors):
+        num_samples = int(np.sum(beh_per_bin == behavior))
+        all_sample_sizes.append(num_samples)
+        print("behavior: ", behavior, "nsamples: ", num_samples)
 
-        # 70/30 split: 70% of these samples will go towards training the general model, the 30% will be tested on
-        # vibes based we can see how performance changes if we adjust this split
-        holdout_idx = int(.3 * len(beh_X))
-        holdout_X, holdout_y = beh_X[:holdout_idx], beh_y[:holdout_idx]
-        using_X, using_y = beh_X[holdout_idx:], beh_y[holdout_idx:]
-
-        test_sizes.append(len(holdout_X))
-
-        X_beh_test[label] = holdout_X
-        y_beh_test[label] = holdout_y
-        
-        beh_per_frame_gen += [label] * len(using_y)
+        # pulls out all samples for all training behaviors
+        idcs = np.where(beh_per_bin == behavior)
+        spikes_by_beh.append(spikes[idcs])
+        locs_by_beh.append(locs[idcs])
+        bins_by_beh.append(idcs)
     
-        X_gen = np.vstack((X_gen, using_X))
-        y_gen = np.vstack((y_gen, using_y))
+    # need to limit the size of testing samples to the smallest behavior
+    min_samples = np.min(all_sample_sizes)
+    # taking %70 of each behavior, so the largest amount of samples across all behaviors is %70 of the smallest set
+    covar_size = int((1-TEST_SIZE) * min_samples)
+    test_size = min_samples - covar_size
+    print(all_sample_sizes)
+    print("NUM COVARS: ", covar_size)
+    print("TEST SIZE: ", test_size)
 
-    X_gen = X_gen[1:]
-    y_gen = y_gen[1:]
-    
-    min_test_size = 157
-    print(test_sizes)
-    print(min_test_size)
-
-    # 2: train a model
+    # change this to a list its such a mess as a dictionary
     scores_by_beh: dict[int, list[float]] = {}
-    for label in behaviors.keys():
+    for label in mouse_day.BEHAVIOR_LABELS.keys():
         scores_by_beh[label] = []
 
-    splitter = StratifiedKFold(n_splits=ntrials, shuffle=True, random_state=42)
-    for i, (train_idcs, test_idcs) in enumerate(splitter.split(X_gen, beh_per_frame_gen)):
-        print("Training Split: ", i)
-        X_train = X_gen[train_idcs]
-        y_train = y_gen[train_idcs]
+    # Train the model
+    model = RidgeCV(alphas=[0.01, 0.1, 1, 10, 100, 1000])
+    for trial in range(ntrials):
+        print("Training split: ", trial)
+        np.random.seed(42 + trial) # ensures replicable randomness overall (still random per trial)
+
+        X_train = np.zeros((1, spikes.shape[1]))
+        y_train = np.zeros((1, locs.shape[1]))
         
-        # Cross-validate to find the best alpha
-        ridge = RidgeCV(alphas=[0.1, 1.0, 10.0, 100.0], fit_intercept=True)
+        X_test_sets = []
+        y_test_sets = []
 
-        # Train the model
-        ridge.fit(X_train, y_train)
+        for behavior in range(len(behaviors)):
+            # Generate a train set by pulling the covar_size amount of samples from each behavior
+            # shuffle the samples for this behavior
+            num_samples = all_sample_sizes[behavior]
+            idcs = np.arange(0, num_samples)
+            np.random.shuffle(idcs)
+            beh_spikes = spikes_by_beh[behavior][idcs]
+            beh_locs = locs_by_beh[behavior][idcs]
 
-        # Evaluate fold model performance and predict on each behavior data
-        for label in X_beh_test.keys():
-            X_test = X_beh_test[label]
-            y_test = y_beh_test[label]
+            # pull the covar size from this set
+            train_spikes = beh_spikes[:covar_size]
+            train_locs = beh_locs[:covar_size]
 
-            # make sure all the test data samples are the same across behaviors
-            indices = np.arange(len(X_test))
-            np.random.shuffle(indices)
-            X_test, y_test = X_test[indices], y_test[indices]
-            X_test, y_test = X_test[:min_test_size], y_test[:min_test_size]
+            X_train = np.vstack((X_train, train_spikes))
+            y_train = np.vstack((y_train, train_locs))
 
-            trial_scores = ridge.score(X_test, y_test)
-            print(f"General Model Score on {behaviors[label]} data: ", trial_scores)
-            scores_by_beh[label].append(trial_scores)# 10 scores per behavior (10 folds)
+            # Generate test sets for each behavior
+            test_spikes = beh_spikes[covar_size:(covar_size+test_size)]
+            test_locs = beh_locs[covar_size:(covar_size+test_size)]
+
+            X_test_sets.append(test_spikes)
+            y_test_sets.append(test_locs)
             
-    io.save_scores_by_beh(mouse_day.mouseID, mouse_day.day, scores_by_beh)
 
+        # trim and shuffle the training samples
+        X_train = X_train[1:]
+        y_train = y_train[1:]
+        idcs = np.arange(0, len(X_train))
+        np.random.shuffle(idcs)
+        X_train = X_train[idcs]
+        y_train = y_train[idcs]
+
+        # train the model
+        model.fit(X_train, y_train)
+
+        # test the model on each behavior
+        for behavior in range(len(behaviors)):
+            if (behavior == 6):
+                behavior = -1 # stupid grooming.. fix later
+            print("scoring the", behavior, "th behavior...")
+            score = model.score(X_test_sets[behavior], y_test_sets[behavior])
+            scores_by_beh[behavior].append(score) # should be ten scores per behavior
+        
+    io.save_scores_by_beh(mouse_day.mouseID, mouse_day.day, scores_by_beh)
     return scores_by_beh
 
 
@@ -741,8 +756,8 @@ if __name__ == "__main__":
     days = ['20240420', '20240421', '20240422', '20240423', '20240424', '20240425', '20240428', '20240429', '20240430', '20240501' ,'20240502', '20240503']
     
     test_md = MouseDay("mouse25", "20240425")
-    s, p = decode_behaviors_with_general(test_md, save_res=False)
-
+    s, p = decode_behaviors(test_md, model_name="ridge", save_res=True)
+    print(s)
 
     # Cross Day Decoding!
     # mouse_days = []
