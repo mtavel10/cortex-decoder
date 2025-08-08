@@ -17,14 +17,26 @@ LEARNED = ["reach", "grasp", "carry"]
 NATURAL = ["non_movement", "fidget", "eating"]
 
 
-def decode_general(mouse_day: MouseDay, model_name="ridge", n_trials: int=10, save_res=False):
+def decode_general(mouse_day: MouseDay, model_name="ridge", lag: int=None, n_trials: int=10, save_res=False):
     """
     Decodes all the samples across the entire population of neurons. 
         Train: General, Test: General
+    Parameters
+        model_name: str
+            either "ridge" or "lasso"
+        lag: int
+            number of frames in the calcium lag
     """
     X = mouse_day.get_trimmed_spks()
     y = mouse_day.get_trimmed_avg_locs()
     beh_per_frame = mouse_day.get_trimmed_beh_labels()
+
+    if lag != None:
+        print("lagging calcium by", lag, "bins...")
+        X = X[lag:]
+        y = y[:-lag]
+        beh_per_frame = beh_per_frame[:-lag]
+
 
     print("X: ", X.shape)
     print("y: ", y.shape)
@@ -67,7 +79,7 @@ def decode_general(mouse_day: MouseDay, model_name="ridge", n_trials: int=10, sa
     
     if (save_res):
         # saves the scores and predictions for plotting
-        io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type=f"general_{model_name}")
+        io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type=f"general_{model_name}_l{lag}")
         # saves the last training iteration just in case
         io.save_model(mouse_day.mouseID, mouse_day.day, model, model_type=f"general_{model_name}")
 
@@ -720,11 +732,11 @@ def md_run(mouse_day: MouseDay, save_status=False):
     # latency_check(mouse_day)
     # dimensions_check(mouse_day)
 
-    fig = myplot.plot_interp_test(mouse_day, mouse_day.seg_keys[0])
-    plt.show()
+    # fig = myplot.plot_interp_test(mouse_day, mouse_day.seg_keys[0])
+    # plt.show()
 
     decode_general(mouse_day, save_res=save_status)
-    fig1 = myplot.plot_kin_predictions(mouse_day)
+    # fig1 = myplot.plot_kin_predictions(mouse_day)
 
     decode_behaviors(mouse_day, save_res=save_status)
     # fig2 = myplot.plot_model_performance_swarm(mouse_day)
@@ -756,25 +768,24 @@ if __name__ == "__main__":
     days = ['20240420', '20240421', '20240422', '20240423', '20240424', '20240425', '20240428', '20240429', '20240430', '20240501' ,'20240502', '20240503']
     
     test_md = MouseDay("mouse25", "20240425")
-    s, p = decode_behaviors(test_md, model_name="ridge", save_res=True)
-    print(s)
+    for i in range(1, 9):
+        s, p = decode_general(test_md, lag=i, save_res=True)
+        print(s)
 
     # Cross Day Decoding!
     # mouse_days = []
     # for mouseID in mouseIDs:
     #     for day in days: 
-    #         if day == '20240422':
-    #             print()
-    #             print("----------------------")
-    #             print("day", day, "...")
-    #             curr_mouse_day = MouseDay(mouseID, day)
-    #             curr_mouse_day.check_bin_tstamp_alignment()
-    #             dimensions_check(curr_mouse_day)
-    #             s, p = decode_general(curr_mouse_day)
-            # myplot.plot_decoded_data(curr_mouse_day)
+    #         print()
+    #         print("----------------------")
+    #         print("day", day, "...")
+    #         curr_mouse_day = MouseDay(mouseID, day)
+        
+    #         # myplot.plot_decoded_data(curr_mouse_day)
 
-            # if day != '20240425' and day != '20240424':
-            #     md_run(curr_mouse_day, save_status=True)
+    #         if day not in ['20240420', '20240421', '20240422', '20240428', '20240502']:
+    #             md_run(curr_mouse_day, save_status=True)
+
 
             # for cross_day in days:
             #     cross_mouse_day = MouseDay(mouseID, cross_day)

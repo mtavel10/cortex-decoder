@@ -1025,11 +1025,68 @@ def plot_decoded_data(mouse_day: MouseDay):
     plt.show()
     return 0
 
+
+def plot_performance_by_lag(mouse_day: MouseDay, min_lag: int, max_lag: int, figsize=(16, 10)):
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
+
+    base_scores, p = io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type="general_ridge")
+    all_scores = []
+    all_scores.append(base_scores)
+    for i in range(min_lag, max_lag+1):
+        s, p = io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type=f"general_ridge_l{i}")
+        all_scores.append(s)
+    
+    # Create color map for train types
+    lag_list = [0] + list(range(min_lag, max_lag+1))
+    colors = plt.cm.tab10(np.linspace(0, 1, len(lag_list)))
+    color_map = {lag: colors[i] for i, lag in enumerate(lag_list)}
+    
+    # Create swarm plot with jitter, colored by train type
+    for i, (scores, lag) in enumerate(zip(all_scores, lag_list)):
+        # Add jitter for better visibility
+        jitter = np.random.normal(0, 0.05, len(scores))
+        x_positions = np.array([i] * len(scores)) + jitter
+        ax.scatter(x_positions, scores, alpha=0.5, s=500, 
+                  color=color_map[lag])
+    
+    # Calculate means and standard deviations
+    means = [np.mean(scores) for scores in all_scores]
+    stds = [np.std(scores) for scores in all_scores]
+    
+    # Define cohesive colors for error bars
+    positive_color = '#2E7D32'  # Dark green that works well with tab10 palette
+    negative_color = '#C62828'  # Dark red that works well with tab10 palette
+    
+    # Plot error bars with colors based on mean values
+    for i, (mean, std) in enumerate(zip(means, stds)):
+        error_color = positive_color if mean >= 0 else negative_color
+        
+        # Horizontal error bars for visual separation
+        ax.errorbar([i], [mean], xerr=0.4, fmt='.', color=error_color, 
+                   linewidth=5, alpha=0.8, markersize=8)
+        # Vertical error bars for standard deviation
+        # # ax.errorbar([i], [mean], yerr=std, fmt='.', color='k', 
+        #            capsize=5, capthick=2, linewidth=2, alpha=0.8, markersize=8)
+    
+    # Customize the plot
+    ax.set_xticks(range(len(lag_list)))
+    ax.set_xticklabels(lag_list, ha='center', fontsize=15)
+    ax.set_xlabel('Lag size (frames)', fontsize=18)
+    ax.set_ylabel('R² Score', fontsize=18)
+    ax.set_title(f"Performance by Lag - with 'non-lagged' labels", fontsize=30)
+    ax.set_xlim(-0.5, len(lag_list) - 0.5)  # Make categories closer together
+    ax.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    
+    return fig
+
+
 if __name__ == "__main__":
 
     m25_april24 = MouseDay('mouse25', '20240424')
     m25_april25 = MouseDay('mouse25', '20240425')
 
-    plot_model_performance_swarm(m25_april25, model_name="lasso")
+    plot_performance_by_lag(m25_april25, 1, 8)
     plt.show()
     
