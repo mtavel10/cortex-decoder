@@ -17,7 +17,9 @@ CROSS_CLASS_MODE = [("natural", "reach"), ("natural", "grasp"), ("natural", "car
 IN_CLASS_MODE = [("learned", "reach"), ("learned", "grasp"), ("learned", "carry"), ("natural", "non_movement"), ("natural", "fidget"), ("natural", "eating")]
 
 # plt.rcParams.update({'font.size': 22}) # Sets the default font size to 12
-behavior_model_types = ["reach", "grasp", "carry", "jumping", "fidget", "eating", "no behavior", "general"]
+# groooming is sometimes included in this list depending on whatyou're doing
+# no behavior is sometimes inncluded too
+behavior_model_types = ["reach", "grasp", "carry", "non_movement_or_kept_jumping", "fidget", "eating", "non_behavior_event"]
 
 def plot_mouseday_data(mouse_day, event_key: str, figsize: Tuple[int, int] = (16, 10)):
     """
@@ -1026,14 +1028,14 @@ def plot_decoded_data(mouse_day: MouseDay):
     return 0
 
 
-def plot_performance_by_lag(mouse_day: MouseDay, min_lag: int, max_lag: int, figsize=(16, 10)):
+def plot_performance_by_lag(mouse_day: MouseDay, min_lag: int, max_lag: int, model_name: str="general_ridge", figsize=(16, 10)):
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
 
-    base_scores, p = io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type="general_ridge")
+    base_scores, p = io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type=model_name)
     all_scores = []
     all_scores.append(base_scores)
     for i in range(min_lag, max_lag+1):
-        s, p = io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type=f"general_ridge_l{i}")
+        s, p = io.load_decoded_data(mouse_day.mouseID, mouse_day.day, model_type=f"{model_name}_l{i}")
         all_scores.append(s)
     
     # Create color map for train types
@@ -1073,7 +1075,7 @@ def plot_performance_by_lag(mouse_day: MouseDay, min_lag: int, max_lag: int, fig
     ax.set_xticklabels(lag_list, ha='center', fontsize=15)
     ax.set_xlabel('Lag size (frames)', fontsize=18)
     ax.set_ylabel('R² Score', fontsize=18)
-    ax.set_title(f"Performance by Lag - with 'non-lagged' labels", fontsize=30)
+    ax.set_title(f"{model_name} Performance by Lag", fontsize=30)
     ax.set_xlim(-0.5, len(lag_list) - 0.5)  # Make categories closer together
     ax.grid(axis='y', alpha=0.3)
 
@@ -1088,5 +1090,11 @@ if __name__ == "__main__":
     m25_april25 = MouseDay('mouse25', '20240425')
 
     plot_performance_by_lag(m25_april25, 1, 8)
+    for beh in behavior_model_types:
+        plot_performance_by_lag(m25_april25, 1, 8, model_name=f"{beh}_ridge")
+
+    plot_performance_by_lag(m25_april25, 1, 8, "learned_class")
+    plot_performance_by_lag(m25_april25, 1, 8, "natural_class")
+
     plt.show()
     

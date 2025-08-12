@@ -2,12 +2,12 @@ import numpy as np
 import pickle
 import glob
 import pandas as pd
-import src.utils
 import os
 import mat73
+from typing import Any, Dict, List, Tuple
 
 
-def load_pickle(filepath):
+def load_pickle(filepath) -> Any:
     with open(filepath, 'rb') as file:
         data = pickle.load(file)
     return data
@@ -18,26 +18,30 @@ def save_pickle(filepath, obj):
         pickle.dump(obj, file)
 
 
-def get_drive(mouseID=None):
+def get_drive() -> str:
+    """ Returns the current working directory. Helper for other loading functions. """
     cwd = os.getcwd()
     return cwd
 
 
-def get_s2p_fld(mouseID,day):
-    drive = get_drive(mouseID)
+def get_s2p_fld(mouseID, day) -> str:
+    """ Gets the data's location within the current working directory. """
+    drive = get_drive()
     s2p_fld = f"{drive}/{mouseID}/{day}"
     return s2p_fld
 
 
-def get_days(mouseID):
-    drive = get_drive(mouseID)
+def get_days(mouseID) -> List[str]:
+    """ Returns a list of days within this mouse's folder """
+    drive = get_drive()
     day_paths = sorted(glob.glob(drive+mouseID+'/*24'))
     days = [day.split('/')[-1] for day in day_paths]
     return days
 
 
-# kinematic/camera data
-def load_cam_event_times(mouseID, day):
+# KINEMATIC DATA
+
+def load_cam_event_times(mouseID, day) -> Dict[Any, Any]:
     s2p_fld = get_s2p_fld(mouseID, day)
     cam_time_fn = f"{s2p_fld}/calcium/cam_event_times.pkl"
     event_times = load_pickle(cam_time_fn)
@@ -46,36 +50,17 @@ def load_cam_event_times(mouseID, day):
     return filt_event_times
 
 
-def load_event_labels(mouseID, day):
+def load_event_labels(mouseID, day) -> np.ndarray:
     s2p_fld = get_s2p_fld(mouseID, day)
     return np.load(f"{s2p_fld}/calcium/event_labels.npy")
 
 
-# calcium data
-def load_spks(mouseID, day):
-    s2p_fld = get_s2p_fld(mouseID, day)
-    spks = np.load(f"{s2p_fld}/calcium/cascade_spks.npy")
-    return spks
-
-def load_spk_labels(mouseID, day):
-    s2p_fld = get_s2p_fld(mouseID, day)
-    labels = np.load(f"{s2p_fld}/calcium/red_labels.npy")
-    return labels
-
-
-def load_cal_event_times(mouseID, day):
-    s2p_fld = get_s2p_fld(mouseID,day)
-    event_times = np.load(f"{s2p_fld}/calcium/calcium_event_times.npy")
-    return event_times
-
-
-# kinematic data
-def load_hdf(file):
+def load_hdf(file) -> pd.DataFrame:
     df = pd.read_hdf(file)
     return df
 
 
-def load_kinematics_df(key,mouseID,day):
+def load_kinematics_df(key,mouseID,day) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Load kinematics data from two camera views. 
     
@@ -114,6 +99,27 @@ def load_kinematics_df(key,mouseID,day):
     df_cam1 = load_hdf(fn_cam1[0])
     df_cam2 = load_hdf(fn_cam2[0])
     return df_cam1,df_cam2
+
+
+# CALCIUM DATA
+
+def load_spks(mouseID, day):
+    s2p_fld = get_s2p_fld(mouseID, day)
+    spks = np.load(f"{s2p_fld}/calcium/cascade_spks.npy")
+    return spks
+
+
+def load_spk_labels(mouseID, day):
+    """ Labels neurons as inhibitory (1) or excitatory (0) """
+    s2p_fld = get_s2p_fld(mouseID, day)
+    labels = np.load(f"{s2p_fld}/calcium/red_labels.npy")
+    return labels
+
+
+def load_cal_event_times(mouseID, day):
+    s2p_fld = get_s2p_fld(mouseID,day)
+    event_times = np.load(f"{s2p_fld}/calcium/calcium_event_times.npy")
+    return event_times
 
 
 # DEPRECIATED - loading in timestamps in dictionary to mark tstamps per event
@@ -169,7 +175,7 @@ def load_reg_dict(mouseID, day) -> np.ndarray:
     """
     Returns a dictionary of day i's 
     """
-    reg_dir= f"{get_drive(mouseID)}/{mouseID}/registered_cell_pairs"
+    reg_dir= f"{get_drive()}/{mouseID}/registered_cell_pairs"
     mat_paths = os.listdir(reg_dir)
     matching_files = []
     for path in mat_paths:
@@ -211,7 +217,7 @@ def load_reg_dict(mouseID, day) -> np.ndarray:
 
 def save_decoded_data(mouseID: str, day: str, scores: list[float]=None, preds: np.ndarray=None, model_type="general"):
     """ Saves decoded scores and predictions for comparison and plotting purposes """
-    file_path = f"{get_drive(mouseID)}/decoded_data/{mouseID}/{day}"
+    file_path = f"{get_drive()}/decoded_data/{mouseID}/{day}"
     print("saving to...", file_path)
     os.makedirs(file_path, mode=0o777, exist_ok=True)
     np.save(f"{file_path}/{model_type}_preds.npy", preds)
@@ -219,31 +225,31 @@ def save_decoded_data(mouseID: str, day: str, scores: list[float]=None, preds: n
 
 
 def save_scores_by_beh(mouseID: str, day: str, scores: dict[int, np.ndarray]):
-    file_path = f"{get_drive(mouseID)}/decoded_data/{mouseID}/{day}"
+    file_path = f"{get_drive()}/decoded_data/{mouseID}/{day}"
     file_name = f"{file_path}/general_scores_by_behavior.pkl"
     save_pickle(file_name, scores)
 
 
 def load_scores_by_beh(mouseID: str, day: str):
-    file_path = f"{get_drive(mouseID)}/decoded_data/{mouseID}/{day}"
+    file_path = f"{get_drive()}/decoded_data/{mouseID}/{day}"
     file_name = f"{file_path}/general_scores_by_behavior.pkl"
     scores = load_pickle(file_name)
     return scores
 
 def load_decoded_data(mouseID: str, day: str, model_type="general"):
     """ Loads decoded scores and predictions for comparison and plotting purposes """
-    file_path = f"{get_drive(mouseID)}/decoded_data/{mouseID}/{day}"
+    file_path = f"{get_drive()}/decoded_data/{mouseID}/{day}"
     preds = np.load(f"{file_path}/{model_type}_preds.npy")
     scores = np.load(f"{file_path}/{model_type}_scores.npy")
     return scores, preds
 
 def save_model(mouseID: str, day: str, model_obj: any, model_type="general"):
-    file_path = f"{get_drive(mouseID)}/decoded_data/{mouseID}/{day}"
+    file_path = f"{get_drive()}/decoded_data/{mouseID}/{day}"
     file_name = f"{file_path}/{model_type}_model.pkl"
     save_pickle(file_name, model_obj)
 
 def load_model(mouseID: str, day: str, model_type="general") -> any:
-    file_path = f"{get_drive(mouseID)}/decoded_data/{mouseID}/{day}/{model_type}_model.pkl"
+    file_path = f"{get_drive()}/decoded_data/{mouseID}/{day}/{model_type}_model.pkl"
     model_obj = load_pickle(file_path)
     return model_obj
 

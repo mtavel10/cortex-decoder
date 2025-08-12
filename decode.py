@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import src.IO as io
-import src.utils as ut
 import math
 from mouse import MouseDay
 from typing import Optional, Tuple
@@ -35,7 +34,7 @@ def decode_general(mouse_day: MouseDay, model_name="ridge", lag: int=None, n_tri
         print("lagging calcium by", lag, "bins...")
         X = X[lag:]
         y = y[:-lag]
-        beh_per_frame = beh_per_frame[:-lag]
+        beh_per_frame = beh_per_frame[lag:]
 
 
     print("X: ", X.shape)
@@ -79,14 +78,20 @@ def decode_general(mouse_day: MouseDay, model_name="ridge", lag: int=None, n_tri
     
     if (save_res):
         # saves the scores and predictions for plotting
-        io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type=f"general_{model_name}_l{lag}")
+        save_as = ""
+        if lag != None:
+            save_as=f"general_{model_name}_l{lag}"
+        else:
+            save_as=f"general_{model_name}"
+    
+        io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type=save_as)
         # saves the last training iteration just in case
-        io.save_model(mouse_day.mouseID, mouse_day.day, model, model_type=f"general_{model_name}")
+        io.save_model(mouse_day.mouseID, mouse_day.day, model, model_type=save_as)
 
     return scores, y_pred
 
 
-def decode_behaviors(mouse_day: MouseDay, model_name="ridge", n_trials: int=10, save_res=False):
+def decode_behaviors(mouse_day: MouseDay, lag: int=None, model_name="ridge", n_trials: int=10, save_res=False):
     """
     Decodes behaviors with models trained on that specific behavior. 
         Train: By Behavior, Test: By Behavior
@@ -94,6 +99,13 @@ def decode_behaviors(mouse_day: MouseDay, model_name="ridge", n_trials: int=10, 
     X = mouse_day.get_trimmed_spks()
     y = mouse_day.get_trimmed_avg_locs()
     beh_per_frame = mouse_day.get_trimmed_beh_labels()
+
+    if lag != None:
+        print("lagging calcium by", lag, "bins...")
+        X = X[lag:]
+        y = y[:-lag]
+        beh_per_frame = beh_per_frame[lag:]
+
     # Shitty workaround until i fix the behavior labels in the mouseday class
     labels = {key: value for key, value in mouse_day.BEHAVIOR_LABELS.items() if key != 6}
     all_preds = []
@@ -137,8 +149,15 @@ def decode_behaviors(mouse_day: MouseDay, model_name="ridge", n_trials: int=10, 
         print("scores: ", scores)
 
         if (save_res):
-            io.save_model(mouse_day.mouseID, mouse_day.day, model, model_type=f"{labels[label]}_{model_name}")
-            io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type=f"{labels[label]}_{model_name}")
+            # saves the scores and predictions for plotting
+            save_as = ""
+            if lag != None:
+                save_as=f"{labels[label]}_{model_name}_l{lag}"
+            else:
+                save_as=f"{labels[label]}_{model_name}"
+    
+            io.save_model(mouse_day.mouseID, mouse_day.day, model, model_type=save_as)
+            io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type=save_as)
 
     return all_scores, y_preds
 
@@ -410,7 +429,7 @@ def decode_by_cell(mouse_day: MouseDay, ntrials: int=10, save_res=False):
 
     return in_scores, in_preds, ex_scores, ex_preds
 
-def decode_by_class(mouse_day: MouseDay, beh_class: str, ntrials: int=10, save_res=False):
+def decode_by_class(mouse_day: MouseDay, beh_class: str, lag: int=None, ntrials: int=10, save_res=False):
     """
     Decodes specific classes of behavior (either "natural" or "learned") and tests within that class. 
         Train: BehClass, Test: BehClass
@@ -418,6 +437,12 @@ def decode_by_class(mouse_day: MouseDay, beh_class: str, ntrials: int=10, save_r
     spikes = mouse_day.get_trimmed_spks()
     locs = mouse_day.get_trimmed_avg_locs() 
     beh_per_frame = mouse_day.get_trimmed_beh_labels()
+
+    if lag != None:
+        spikes = spikes[lag:]
+        locs = locs[:-lag]
+        beh_per_frame = beh_per_frame[lag:]
+
     
     # separate out data by behavior class
     if beh_class == "learned":
@@ -451,8 +476,15 @@ def decode_by_class(mouse_day: MouseDay, beh_class: str, ntrials: int=10, save_r
     for test_idcs, pred in y_preds:
         y_pred[test_idcs] = pred
     
-    io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type=f"{beh_class}_class")
-    io.save_model(mouse_day.mouseID, mouse_day.day, ridge, model_type=f"{beh_class}_class")
+    if (save_res):
+        save_as=""
+        if lag != None:
+            save_as=f"{beh_class}_class_l{lag}"
+        else:
+            save_as=f"{beh_class}_class"
+    
+        io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred, model_type=save_as)
+        io.save_model(mouse_day.mouseID, mouse_day.day, ridge, model_type=save_as)
 
     return scores, y_pred
 
@@ -761,39 +793,40 @@ def md_run(mouse_day: MouseDay, save_status=False):
     # plt.show()
     return 0
 
+def decode_across_days(mouse_days: list[MouseDay]):
+    for curr_day in mouse_days:
+        for cross_day in mouse_days:
+
+            if curr_day != cross_day:
+                    s, p = decode_crossday_general(train_day=curr_day, test_day=cross_day, cross_test=True, save_res=True)
+                    print(f"{curr_day.day} x {cross_day.day} scores: ", s)
+            else:
+                # just train a general model on the day's registered neurons
+                s, p = decode_crossday_general(train_day=curr_day, test_day=cross_day, cross_test=False, save_res=True)
+                print(f"{curr_day.day}'s registered neuron scores: ", s)
+
+
+def decode_gen_with_lag(mouse_day: MouseDay):
+    for i in range(1, 9):
+        s, p = decode_general(mouse_day, lag=i, save_res=True)
+        print(s)
+
+def decode_beh_with_lag(mouse_day: MouseDay):
+    for i in range(1, 9):
+        s, p  = decode_behaviors(mouse_day, lag=i, save_res=True)
+        print(s)
+
+def decode_class_with_lag(mouse_day: MouseDay, class_type: str):
+    for i in range(1, 9):
+        s, p = decode_by_class(mouse_day, beh_class=class_type, lag=i, save_res=True)
+        print(s)
 
 if __name__ == "__main__":
 
     mouseIDs = ['mouse25']
     days = ['20240420', '20240421', '20240422', '20240423', '20240424', '20240425', '20240428', '20240429', '20240430', '20240501' ,'20240502', '20240503']
+    test_day = MouseDay("mouse25", "20240425")
+    decode_beh_with_lag(test_day)
+    decode_class_with_lag(test_day, "learned")
+    decode_class_with_lag(test_day, "natural")
     
-    test_md = MouseDay("mouse25", "20240425")
-    for i in range(1, 9):
-        s, p = decode_general(test_md, lag=i, save_res=True)
-        print(s)
-
-    # Cross Day Decoding!
-    # mouse_days = []
-    # for mouseID in mouseIDs:
-    #     for day in days: 
-    #         print()
-    #         print("----------------------")
-    #         print("day", day, "...")
-    #         curr_mouse_day = MouseDay(mouseID, day)
-        
-    #         # myplot.plot_decoded_data(curr_mouse_day)
-
-    #         if day not in ['20240420', '20240421', '20240422', '20240428', '20240502']:
-    #             md_run(curr_mouse_day, save_status=True)
-
-
-            # for cross_day in days:
-            #     cross_mouse_day = MouseDay(mouseID, cross_day)
-
-            #     if day != cross_day:
-            #         s, p = decode_crossday_general(train_day=curr_mouse_day, test_day=cross_mouse_day, cross_test=True, save_res=True)
-            #         print(f"{day} x {cross_day} scores: ", s)
-            #     else:
-            #         # just train a general model on the day's registered neurons
-            #         s, p = decode_crossday_general(train_day=curr_mouse_day, test_day=cross_mouse_day, cross_test=False, save_res=True)
-            #         print(f"{day}'s registered neuron scores: ", s)
