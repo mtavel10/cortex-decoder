@@ -15,7 +15,6 @@ BEH_CLASSES = {"all": [0, 1, 2, 3, 4, 5], "learned": [0, 1, 2], "natural": [3, 4
 LEARNED = ["reach", "grasp", "carry"]
 NATURAL = ["non_movement", "fidget", "eating"]
 
-
 def decode_general(mouse_day: MouseDay, model_name="ridge", lag: int=None, n_trials: int=10, save_res=False):
     """
     Decodes all the samples across the entire population of neurons. 
@@ -35,7 +34,6 @@ def decode_general(mouse_day: MouseDay, model_name="ridge", lag: int=None, n_tri
         X = X[lag:]
         y = y[:-lag]
         beh_per_frame = beh_per_frame[lag:]
-
 
     print("X: ", X.shape)
     print("y: ", y.shape)
