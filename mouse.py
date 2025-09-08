@@ -225,6 +225,30 @@ class MouseDay:
 
         return self.cal_tstamps[32:-32]
 
+    def latency_check(mouse_day: MouseDay):
+        print("# of timestamps (calcium): ", mouse_day.cal_ntimestamps)
+        print("# of datapoints (calcium): ", mouse_day.cal_nframes)
+        mouse_day.check_caltime_latency()
+        return 0
+
+    def dimensions_check(mouse_day: MouseDay):
+        test_locs = mouse_day.get_trimmed_avg_locs()
+        test_spikes = mouse_day.get_trimmed_spks()
+        test_labels = mouse_day.get_trimmed_beh_labels()
+
+        test_untrimmedlocs = mouse_day.get_all_avg_locations()
+        test_untrimmedspks = mouse_day.cal_spks.T
+        test_untrimmed_labels = mouse_day.get_beh_labels()
+
+        print("No Trim Locs: ", test_untrimmedlocs.shape)
+        print("No Trim Spikes: ", test_untrimmedspks.shape)
+        print("No Trim Labels: ", len(test_untrimmed_labels))
+
+        print("Trimmed Locs: ", test_locs.shape)
+        print("Trimmed Spikes: ", test_spikes.shape)
+        print("Trimmed labels: ", len(test_labels))
+        return 0
+
     # Not in use, changed the list of boydparts to a static variable
     def get_bodyparts(self, df):
         # Extract level 1 (bodyparts) and get unique values
@@ -472,30 +496,5 @@ class MouseDay:
         return self.get_beh_labels()[32:-32]
     
 
-
 if __name__ == "__main__":
     mouse_day = MouseDay("mouse25", "20240422")
-    print("here")
-    mouse_day.check_bin_tstamp_alignment()
-
-    # test_locs = mouse_day.get_trimmed_avg_locs()
-    # test_spikes = mouse_day.get_trimmed_spks()
-    # test_labels = mouse_day.get_trimmed_beh_labels()
-
-    # test_untrimmedlocs = mouse_day.get_all_avg_locations()
-    # test_untrimmedspks = mouse_day.cal_spks.T
-    # test_untrimmed_labels = mouse_day.get_beh_labels()
-
-    # print("No Trim Locs: ", test_untrimmedlocs.shape)
-    # print("No Trim Spikes: ", test_untrimmedspks.shape)
-    # print("No Trim Labels: ", len(test_untrimmed_labels))
-
-    # print("Trimmed Locs: ", test_locs.shape)
-    # print("Trimmed Spikes: ", test_spikes.shape)
-    # print("Trimmed labels: ", len(test_labels))
-
-    # print("------------")
-    # print()
-    # print("# of timestamps (calcium): ", mouse_day.cal_ntimestamps)
-    # print("# of datapoints (calcium): ", mouse_day.cal_nframes)
-    # mouse_day.check_caltime_latency()

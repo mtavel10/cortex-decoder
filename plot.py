@@ -2,8 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.patches import Patch
-import seaborn as sns
-from typing import List, Dict, Tuple
+from typing import Tuple
 from mouse import MouseDay
 import decode as decode
 import src.IO as io

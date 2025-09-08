@@ -12,15 +12,16 @@ Summer Research Project - Maclean Lab @ University of Chicago
 import logging
 import numpy as np
 import pandas as pd
-from typing import Optional, Tuple, Dict, List, Any
+from typing import Optional, Tuple, Dict, List, Any, Literal
 from sklearn.model_selection import StratifiedKFold, KFold, StratifiedShuffleSplit
 from sklearn.linear_model import RidgeCV, MultiTaskLassoCV
 
 import src.IO as io
 from mouse import MouseDay
 
+
 TEST_SIZE = .30
-ALPHAS = [0.01, 0.1, 1.0, 10.0, 100.0, 1000.0]
+ALPHAS = ALPHAS = [1e-3, 1e-2, 1e-1, 1.0, 10.0]
 
 BEHAVIOR_CLASSES = {
     "all": [0, 1, 2, 3, 4, 5], 
@@ -38,11 +39,12 @@ LEARNED_BEHAVIORS = ["reach", "grasp", "carry"]
 NATURAL_BEHAIORS = ["non_movement", "fidget", "eating"]
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class CortexDecoder:
     """Predicts mouse-paw positions from calcium spike data."""
 
-    def __init__(self, log_level: logging._LevelLEVEL=logging.INFO, 
+    def __init__(self, log_level: Literal[20]=logging.INFO, 
                  alphas: List[float]=None, random_state: int=42):
         """
         Initialize decoder with hyperparameters. 
@@ -75,6 +77,39 @@ class CortexDecoder:
             return MultiTaskLassoCV(alphas=self.alphas)
         else:
             return RidgeCV(alphas=self.alphas, fit_intercept=True)
+    
+    def _get_minimum_behavior_samples(self, mouse_day: MouseDay, 
+                                     behavior_list: List[int] = None) -> Tuple[int, List[int]]:
+        """
+        Find minimum sample count across behaviors for balanced analysis.
+        
+        Parameters
+        ----------
+        mouse_day : MouseDay
+            Experimental session data
+        behavior_list : List[int], optional
+            Specific behaviors to analyze. If None, uses all behaviors.
+            
+        Returns
+        -------
+        min_samples : int
+            Smallest sample count across behaviors
+        sample_counts : List[int]
+            Sample count for each behavior
+        """
+        if behavior_list is None:
+            behavior_list = BEHAVIOR_CLASSES["all"]
+        
+        behavior_labels = mouse_day.get_trimmed_beh_labels()
+        sample_counts = []
+        min_samples = float('inf')
+        
+        for behavior_id in behavior_list:
+            count = np.sum(behavior_labels == behavior_id)
+            sample_counts.append(count)
+            min_samples = min(min_samples, count)
+        
+        return int(min_samples), sample_counts
 
 
     def decode_general_population(self, mouse_day: MouseDay, model_type="ridge",
@@ -257,7 +292,7 @@ class CortexDecoder:
         # 2. Cross-validate a model with behavior-balanced sets
         for fold in range(n_trials):
             logger.info(f"Processing fold {fold+1}/{n_trials}")
-            np.random.seed(42 + fold)
+            np.random.seed(self.random_state + fold)
             
             # Create balanced training set
             X_train_list = []
@@ -266,7 +301,7 @@ class CortexDecoder:
 
             for behavior_id, data in behavior_data.items():
                 # Shuffle and split data
-                indices = np.random.permulation(behavior_data[behavior_id]['n_samples'])
+                indices = np.random.permutation(behavior_data[behavior_id]['n_samples'])
 
                 train_end = train_samples_per_behavior
                 test_end = train_end + test_samples_per_behavior
@@ -302,84 +337,84 @@ class CortexDecoder:
         return scores_by_behavior
 
 
-def decode_by_cell_type(self, mouse_day: MouseDay, n_trials: int=10, 
-                        save_results: bool=False) -> Tuple[List[float], List[float],
-                                                           np.ndarray, np.ndarray]:
-    """
-    Compare decoder performance between excitatory and inhibitory neurons. 
+    def decode_by_cell_type(self, mouse_day: MouseDay, n_trials: int=10, 
+                            save_results: bool=False) -> Tuple[List[float], List[float],
+                                                            np.ndarray, np.ndarray]:
+        """
+        Compare decoder performance between excitatory and inhibitory neurons. 
 
-    Returns
-    -------
-    inhibitory_scores: List[float]
-        R^2 scores for inhibitory neurons
-    excitatory_scores: List[float]
-        R^2 scores for excitatory neurons
-    inhibitory_predictions: np.ndarray
-        Position predictions from inhibitory neurons
-    excitatory_predictions: np.ndarray
-        Position predictions from excitatory neurons
-    """
-    cell_labels = mouse_day.cell_labels
-    X = mouse_day.get_trimmed_spks()
-    y = mouse_day.get_trimmed_avg_locs()
-    behavior_labels = mouse_day.get_trimmed_beh_labels()
+        Returns
+        -------
+        inhibitory_scores: List[float]
+            R^2 scores for inhibitory neurons
+        excitatory_scores: List[float]
+            R^2 scores for excitatory neurons
+        inhibitory_predictions: np.ndarray
+            Position predictions from inhibitory neurons
+        excitatory_predictions: np.ndarray
+            Position predictions from excitatory neurons
+        """
+        cell_labels = mouse_day.cell_labels
+        X = mouse_day.get_trimmed_spks()
+        y = mouse_day.get_trimmed_avg_locs()
+        behavior_labels = mouse_day.get_trimmed_beh_labels()
 
-    # Split neural data by cell type
-    X_inhibitory = X[:, cell_labels]
-    X_excitatory = X[: , ~cell_labels]
+        # Split neural data by cell type
+        X_inhibitory = X[:, cell_labels]
+        X_excitatory = X[: , ~cell_labels]
 
-    # Balance feature spaces for fair comparison
-    min_features = min(X_inhibitory.shape[1], X_excitatory.shape[1])
-    logger.info(f"Balancing to {min_features} neurons per cell type")
-    
-    if X_excitatory.shape[1] > min_features: # Always more excitatory
-        np.random.seed(self.random_state)
-        selected_features = np.random.choice(X_excitatory.shape[1], min_features, replace=False)
-        X_excitatory = X_excitatory[:, selected_features]
+        # Balance feature spaces for fair comparison
+        min_features = min(X_inhibitory.shape[1], X_excitatory.shape[1])
+        logger.info(f"Balancing to {min_features} neurons per cell type")
+        
+        if X_excitatory.shape[1] > min_features: # Always more excitatory
+            np.random.seed(self.random_state)
+            selected_features = np.random.choice(X_excitatory.shape[1], min_features, replace=False)
+            X_excitatory = X_excitatory[:, selected_features]
 
-    cell_type_data = {
-        'inhibitory': {'X': X_inhibitory, 'scores': [], 'predictions': None}, 
-        'excitatory': {'X': X_excitatory, 'scores': [], 'predictions': None}
-    }
+        cell_type_data = {
+            'inhibitory': {'X': X_inhibitory, 'scores': [], 'predictions': None}, 
+            'excitatory': {'X': X_excitatory, 'scores': [], 'predictions': None}
+        }
 
-    # Train and evaluate each cell type's population
-    for cell_type, data in cell_type_data.items():
-        logger.info(f"Decoding {cell_type} interneuron activity...")
+        # Train and evaluate each cell type's population
+        for cell_type, data in cell_type_data.items():
+            logger.info(f"Decoding {cell_type} interneuron activity...")
 
-        splitter = StratifiedShuffleSplit(
-            n_splits=n_trials, test_size=TEST_SIZE, 
-            train_size=(1-TEST_SIZE), random_state=self.random_state
-        )
+            splitter = StratifiedShuffleSplit(
+                n_splits=n_trials, test_size=TEST_SIZE, 
+                train_size=(1-TEST_SIZE), random_state=self.random_state
+            )
 
-        fold_predictions = []
+            fold_predictions = []
 
-        for fold, (train_idcs, test_idcs) in enumerate(splitter.split(data['X'], behavior_labels)):
-            logger.info(f"Processing fold {fold+1}/{n_trials}")
+            for fold, (train_idcs, test_idcs) in enumerate(splitter.split(data['X'], behavior_labels)):
+                logger.info(f"Processing fold {fold+1}/{n_trials}")
+                
+                X_train, X_test = data['X'][train_idcs], data['X'][test_idcs]
+                y_train, y_test = y[train_idcs], y[test_idcs]
+
+                model = self._create_model(model_type="ridge")
+                model.fit(X_train, y_train)
+
+                data['scores'].append(model.score(X_test, y_test))
+
+                y_pred_fold = model.predict(X_test)
+                fold_predictions.append((test_idcs, y_pred_fold))
             
-            X_train, X_test = data['X'][train_idcs], data['X'][test_idcs]
-            y_train, y_test = y[train_idcs], y[test_idcs]
+            # Reconstruct full predictions
+            y_predictions = np.zeros_like(y)
+            for test_idcs, preds in fold_predictions:
+                y_predictions[test_idcs] = preds
+            data['predictions'] = y_predictions
+            
+            if save_results:
+                io.save_decoded_data(mouse_day.mouseID, mouse_day.day, data['scores'],
+                                    data['predictions'], model_type=cell_type)
+                io.save_model(mouse_day.mouseID, mouse_day.day, model, model_type=cell_type)
 
-            model = self._create_model(model_type="ridge")
-            model.fit(X_train, y_train)
-
-            data['scores'].append(model.score(X_test, y_test))
-
-            y_pred_fold = model.predict(X_test)
-            fold_predictions.append((test_idcs, y_pred_fold))
-        
-        # Reconstruct full predictions
-        y_predictions = np.zeros_like(y)
-        for test_idcs, preds in y_predictions:
-            y_predictions[test_idcs] = preds
-        data['predictions'] = y_predictions
-        
-        if save_results:
-            io.save_decoded_data(mouse_day.mouseID, mouse_day.day, data['scores'],
-                                  data['predictions'], model_type=cell)
-            io.save_model(mouse_day.mouseID, mouse_day.day, model, model_type=cell_type)
-
-        return (cell_type_data['inhibitory']['scores'], cell_type_data['excitatory']['scores'],
-                cell_type_data['inhibitory']['predictions'], cell_type_data['excitatory']['predictions'])
+            return (cell_type_data['inhibitory']['scores'], cell_type_data['excitatory']['scores'],
+                    cell_type_data['inhibitory']['predictions'], cell_type_data['excitatory']['predictions'])
 
 
     def decode_behavioral_class(self, mouse_day: MouseDay, behavior_class: str, 
@@ -401,9 +436,9 @@ def decode_by_cell_type(self, mouse_day: MouseDay, n_trials: int=10,
 
         # Sort behaviors based on class
         if behavior_class == "learned":
-            class_mask = (behavior_labels in BEHAVIOR_CLASSES['learned'])
+            class_mask = np.isin(behavior_labels, BEHAVIOR_CLASSES['learned'])
         elif behavior_class == "natural":
-            class_mask = (behavior_labels in BEHAVIOR_CLASSES['natural'])
+            class_mask = np.isin(behavior_labels, BEHAVIOR_CLASSES['natural'])
         else:
             raise ValueError("behavior_class must be 'learned' or 'natural'")
     
@@ -448,396 +483,403 @@ def decode_by_cell_type(self, mouse_day: MouseDay, n_trials: int=10,
         return scores, y_predictions
 
 
-    def get_minimum_behavior_samples(self, mouse_day: MouseDay, 
-                                     behavior_list: List[int] = None) -> Tuple[int, List[int]]:
+    def decode_within_vs_across_classes(self, mouse_day: MouseDay, 
+                                        train_behaviors: List[int], 
+                                        test_behaviors: List[int], 
+                                        analysis_mode: str, 
+                                        n_trials: int=10, 
+                                        save_results: bool=False) -> Tuple[List[float], np.ndarray]:
         """
-        Find minimum sample count across behaviors for balanced analysis.
-        
+        Compare within-class vs cross-class behavioral decoding. 
+
         Parameters
         ----------
-        mouse_day : MouseDay
-            Experimental session data
-        behavior_list : List[int], optional
-            Specific behaviors to analyze. If None, uses all behaviors.
-            
+        train_behaviors: List[int]
+            Behaviors IDs to train on
+        test_behaviors: List[int]
+            Behaviors IDs to test on
+        analysis_mode: str
+            Either "in_class" or "cross_class"
+        n_trials: int
+            Number of cross-validation trials
+        save_results: bool
+            Whether to save results
+
         Returns
         -------
-        min_samples : int
-            Smallest sample count across behaviors
-        sample_counts : List[int]
-            Sample count for each behavior
+        scores: List[float]
+            Cross-validation R^2 scores
+        predictions: np.ndarray
+            Full prediction array
         """
-        if behavior_list is None:
-            behavior_list = BEHAVIOR_CLASSES["all"]
-        
+        X = mouse_day.get_trimmed_spks()
+        y = mouse_day.get_trimmed_avg_locs() 
         behavior_labels = mouse_day.get_trimmed_beh_labels()
-        sample_counts = []
-        min_samples = float('inf')
-        
-        for behavior_id in behavior_list:
-            count = np.sum(behavior_labels == behavior_id)
-            sample_counts.append(count)
-            min_samples = min(min_samples, count)
-        
-        return int(min_samples), sample_counts
 
+        behavior_mapping: dict[int, str] = mouse_day.BEHAVIOR_LABELS
+        logger.info(f"Training on: {[behavior_mapping[b] for b in train_behaviors]}")
+        logger.info(f"{[behavior_mapping[b] for b in test_behaviors]}")
 
-def decode_within_vs_across_classes(self, mouse_day: MouseDay, 
-                                    train_behaviors: List[int], 
-                                    test_behaviors: List[int], 
-                                    analysis_mode: str, 
-                                    n_trials: int=10, 
-                                    save_results: bool=False) -> Tuple[List[float], np.ndarray]:
-    """
-    Compare within-class vs cross-class behavioral decoding. 
+        # Calculate balanced sample sizes
+        min_train_samples, train_sample_counts = self._get_minimum_behavior_samples(
+            mouse_day, train_behaviors
+        )
 
-    Parameters
-    ----------
-    train_behaviors: List[int]
-        Behaviors IDs to train on
-    test_behaviors: List[int]
-        Behaviors IDs to test on
-    analysis_mode: str
-        Either "in_class" or "cross_class"
-    n_trials: int
-        Number of cross-validation trials
-    save_results: bool
-        Whether to save results
+        # Organize data by behavior
+        train_behavior_data = {}
+        for behavior_id in train_behaviors:
+            mask = behavior_labels == behavior_id
+            train_behavior_data[behavior_id] = {
+                'X': X[mask],
+                'y': y[mask],
+                'indices': np.where(mask)[0]
+            }
 
-    Returns
-    -------
-    scores: List[float]
-        Cross-validation R^2 scores
-    predictions: np.ndarray
-        Full prediction array
-    """
-    X = mouse_day.get_trimmed_spks()
-    y = mouse_day.get_trimmed_avg_locs() 
-    behavior_labels = mouse_day.get_trimmed_beh_labels()
-
-    behavior_mapping: dict[int, str] = mouse_day.BEHAVIOR_LABELS
-    logger.info(f"Training on: {[behavior_mapping[b] for b in train_behaviors]}")
-    logger.info(f"{[behavior_mapping[b] for b in test_behaviors]}")
-
-    # Calculate balanced sample sizes
-    min_train_samples, train_sample_counts = self.get_minimum_behavior_samples(
-        mouse_day, train_behaviors
-    )
-
-    # Organize data by behavior
-    train_behavior_data = {}
-    for behavior_id in train_behaviors:
-        mask = behavior_labels == behavior_id
-        train_behavior_data[behavior_id] = {
-            'X': X[mask],
-            'y': y[mask],
-            'indices': np.where(mask)[0]
-        }
-
-    # Determine test set configuration
-    if analysis_mode == "in_class":
-        # Test on held-out samples from the same class
-        test_behavior = test_behaviors[0] # For now, just testing on single behaviors
-        if test_behavior not in train_behaviors:
-            raise ValueError("For within_class mode, test behavior must be in train behavior class")
-        
-        # Test set sizes are balanced between all in_class behaviors
-        test_samples_per_behavior = int(0.3 * min_train_samples)
-        train_samples_per_behavior = min_train_samples = test_samples_per_behavior
-
-    elif analysis_mode == "cross_class":
-        # Test on different behavioral class
-        all_behavior_min, _ = self.get_minimum_behavior_samples(mouse_day, BEHAVIOR_CLASSES["all"])
-        test_samples_per_behavior = all_behavior_min
-        train_samples_per_behavior = min_train_samples
-
-    else:
-        raise ValueError("analysis_mode must be 'in_class' or 'cross_class'")
-
-    logger.debug(f"Using {train_samples_per_behavior} training samples per behavior")
-    logger.debug(f"Using {test_samples_per_behavior} test samples")
-
-    # Cross-validation
-    model = self._create_model(model_type="ridge")
-    scores = []
-    fold_predictions = []
-        
-    for fold in range(n_trials):
-        logger.info(f"Processing fold {fold+1}/{n_trials}")
-        np.random.seed(self.random_state + fold)
-
-        # Build training set with balanced sampling
-        X_train_parts = []
-        y_train_parts = []
-
-        # Handle test set creation based on analysis mode
+        # Determine test set configuration
         if analysis_mode == "in_class":
-            # Hold out test samples from target behavior
-            test_behavior = test_behaviors[0]
-            test_behavior_data = train_behavior_data[test_behavior]
-
-            # Shuffle and split test behavior data
-            n_test_behavior_samples = len(test_behavior_data['X'])
-            test_behavior_indices = np.random.permutation(n_test_behavior_samples)
-
-            train_indices = test_behavior_indices[:train_samples_per_behavior]
-            test_indices = test_behavior_indices[train_samples_per_behavior:train_samples_per_behavior + test_samples_per_behavior]
-
-            # Create test sets
-            X_test = test_behavior_data['X'][test_indices]
-            y_test = test_behavior_data['y'][test_indices]
+            # Test on held-out samples from the same class
+            test_behavior = test_behaviors[0] # For now, just testing on single behaviors
+            if test_behavior not in train_behaviors:
+                raise ValueError("For within_class mode, test behavior must be in train behavior class")
             
-            # Create train sets
-            # Add test behavior portion, then other train behaviors
-            X_train_parts.append(test_behavior_data['X'][train_indices])
-            y_train_parts.append(test_behavior_data['y'][train_indices])
+            # Test set sizes are balanced between all in_class behaviors
+            test_samples_per_behavior = int(0.3 * min_train_samples)
+            train_samples_per_behavior = min_train_samples = test_samples_per_behavior
+
+        elif analysis_mode == "cross_class":
+            # Test on different behavioral class
+            all_behavior_min, _ = self._get_minimum_behavior_samples(mouse_day, BEHAVIOR_CLASSES["all"])
+            test_samples_per_behavior = all_behavior_min
+            train_samples_per_behavior = min_train_samples
+
+        else:
+            raise ValueError("analysis_mode must be 'in_class' or 'cross_class'")
+
+        logger.debug(f"Using {train_samples_per_behavior} training samples per behavior")
+        logger.debug(f"Using {test_samples_per_behavior} test samples")
+
+        # Cross-validation
+        model = self._create_model(model_type="ridge")
+        scores = []
+        fold_predictions = []
             
-            for behavior_id in train_behaviors:
-                if behavior_id != test_behavior:
+        for fold in range(n_trials):
+            logger.info(f"Processing fold {fold+1}/{n_trials}")
+            np.random.seed(self.random_state + fold)
+
+            # Build training set with balanced sampling
+            X_train_parts = []
+            y_train_parts = []
+
+            # Handle test set creation based on analysis mode
+            if analysis_mode == "in_class":
+                # Hold out test samples from target behavior
+                test_behavior = test_behaviors[0]
+                test_behavior_data = train_behavior_data[test_behavior]
+
+                # Shuffle and split test behavior data
+                n_test_behavior_samples = len(test_behavior_data['X'])
+                test_behavior_indices = np.random.permutation(n_test_behavior_samples)
+
+                train_indices = test_behavior_indices[:train_samples_per_behavior]
+                test_indices = test_behavior_indices[train_samples_per_behavior:train_samples_per_behavior + test_samples_per_behavior]
+
+                # Create test sets
+                X_test = test_behavior_data['X'][test_indices]
+                y_test = test_behavior_data['y'][test_indices]
+                
+                # Create train sets
+                # Add test behavior portion, then other train behaviors
+                X_train_parts.append(test_behavior_data['X'][train_indices])
+                y_train_parts.append(test_behavior_data['y'][train_indices])
+                
+                for behavior_id in train_behaviors:
+                    if behavior_id != test_behavior:
+                        data = train_behavior_data[behavior_id]
+                        indices = np.random.permutation(len(data['X']))
+                        X_train_parts.append(data['X'][indices[:train_samples_per_behavior]])
+                        y_train_parts.append(data['y'][indices[:train_samples_per_behavior]])
+                
+            elif analysis_mode == "cross_class":
+                # Train on all training behaviors
+                for behavior_id in train_behaviors:
                     data = train_behavior_data[behavior_id]
-                    indices = np.random.permuation(len(data['X']))
+                    indices = np.random.permutation(len(data['X']))
+                    
                     X_train_parts.append(data['X'][indices[:train_samples_per_behavior]])
                     y_train_parts.append(data['y'][indices[:train_samples_per_behavior]])
+                    
+                # Test on outside behavior
+                test_mask = np.isin(behavior_labels, test_behaviors)
+                test_indices = np.where(test_mask)[0]
+                np.random.shuffle(test_indices)
+
+                X_test = X[test_indices]
+                y_test = y[test_indices]
+                test_indices_global = test_indices
+
+            # Combine and shuffle training data
+            X_train = np.vstack(X_train_parts)
+            y_train = np.vstack(y_train_parts)
+
+            train_shuffle_idcs = np.random.permutation(len(X_train))
+            X_train = X_train[train_shuffle_idcs]
+            y_train = y_train[train_shuffle_idcs]
+
+            # Train and evaluate
+            model.fit(X_train, y_train)
+            scores.append(model.score(X_test, y_test))
             
-        elif analysis_mode == "cross_class":
-            # Train on all training behaviors
-            for behavior_id in train_behaviors:
-                data = train_behavior_data[behavior_id]
-                indices = np.random.permutation(len(data['X']))
-                
-                X_train_parts.append(data['X'][indices[:train_samples_per_behavior]])
-                y_train_parts.append(data['y'][indices[:train_samples_per_behavior]])
-                
-            # Test on outside behavior
-            test_mask = np.isin(behavior_labels, test_behaviors)
-            test_indices = np.where(test_mask)[0]
-            np.random.shuffle(test_indices)
-
-            X_test = X[test_indices]
-            y_test = y[test_indices]
-            test_indices_global = test_indices
-
-
-
-            test_idcs = np.where(np.isin(beh_per_bin, test_class))[0]
-            test_idcs = test_idcs[:test_size]
-            X_test = spikes[test_idcs]
-            y_test = locs[test_idcs]
-            # X_test = X_test[:test_size]
-            # y_test = y_test[:test_size]
+            # Store predictions
+            y_pred_fold = model.predict(X_test)
+            fold_predictions.append((test_indices_global, y_pred_fold))
         
-        print("test size: ", test_size, ", ", len(X_test)) # these numbers should be the same
 
-
-        # Generates a training split... 
-        # covariate balancing:  randomly pulling the smallest sample size from each behavior's data
-        for i, train_beh in enumerate(train_class):
-            # shuffle and limit the size of each sample
-            train_samples = samples_by_beh[i]
-            train_locs = locs_by_beh[i]
-
-            idcs = np.arange(0, len(train_samples))
-            np.random.shuffle(idcs)
-            train_samples = train_samples[idcs]
-            train_samples = train_samples[:num_covars]
-            train_locs = train_locs[idcs]
-            train_locs = train_locs[:num_covars]
-
-            X_train = np.vstack((X_train, train_samples))
-            y_train = np.vstack((y_train, train_locs))
-
-        # give the training sets a lil trim and shuffle
-        X_train = X_train[1:]
-        y_train = y_train[1:]
-        idcs = np.arange(0, len(X_train))
-        np.random.shuffle(idcs)
-        X_train = X_train[idcs]
-        y_train = y_train[idcs]
-
-        # or reset the test_class_samples for the next fold (if the test set is in the train class)
-        if mode == "in_class":
-            samples_by_beh[test_class_idx] = test_class_samples
-            locs_by_beh[test_class_idx] = test_class_locs
+        # Reconstruct full predictions
+        y_predictions = np.zeros_like(y)
+        for test_indices, pred in fold_predictions:
+            y_predictions[test_indices] = pred
         
-        # linreg = LinearRegression()
-        # linreg.fit(X_train, y_train)
-        # score = linreg.score(X_test, y_test)
-        # scores.append(score)
-
-        ridge.fit(X_train, y_train)
-        score = ridge.score(X_test, y_test)
-        scores.append(score)
-
-        y_pred_fold = ridge.predict(X_test)
-        y_preds.append((test_idcs, y_pred_fold))
-    
-
-    # Reconstruct predictions based on all the test indicies
-    y_pred_full = np.zeros_like(locs)
-    for test_idcs, y_pred_fold in y_preds:
-        y_pred_full[test_idcs] = y_pred_fold
-    
-    if (save_res):
-        train_class_type = [key for key, value in BEH_CLASSES.items() if value==train_class][0]
-        test_class_type = [key for key, value in BEH_CLASSES.items() if value==test_class][0]
-        print(train_class_type)
-        print(test_class_type)
-        io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_pred_full, model_type=f"{train_class_type}_x_{test_class_type}")
-       
-    return scores, y_pred_full
+        # Save results
+        if save_results:
+            train_class_name = next(k for k, v in BEHAVIOR_CLASSES.items() if v == train_behaviors)
+            test_class_name = next(k for k, v in BEHAVIOR_CLASSES.items() if v == test_behaviors)
+            save_label = f"{train_class_name}_x_{test_class_name}"
+            io.save_decoded_data(mouse_day.mouseID, mouse_day.day, scores, y_predictions, 
+                               model_type=save_label)
+        
+        return scores, y_predictions
 
 
-def decode_crossday_general(train_day: MouseDay, test_day: MouseDay, cross_test: bool=False, ntrials: int=10, save_res=False):
-    """
-    Decoding paw positions from the general population of REGISTERED neurons.
-    Model is trained on the train_day's registered neurons. 
-    If cross-test is true, we test on the test_day. Otherwise test on train_day's holdout. 
-    """
-    
-    X = train_day.get_trimmed_spks(reg_key=test_day.day)
-    y = train_day.get_trimmed_avg_locs()
-    beh_labels = train_day.get_trimmed_beh_labels()
+class CrossDayDecoder(CortexDecoder):
+    """Extension for cross-day decoding experiments."""
 
-    if (cross_test):
-        X_cross_day = test_day.get_trimmed_spks(reg_key=train_day.day)
-        y_cross_day = test_day.get_trimmed_avg_locs()
+    def decode_two_days(self, train_day: MouseDay, test_day: MouseDay, 
+                                cross_test: bool=True, n_trials: int=10, 
+                                save_results: bool=False) -> Tuple[List[float], np.ndarray]:
+        """
+        Decode using registered neurons across two daily sessions. 
 
-    scores = []
+        Parameters
+        ----------
+        train_day: MouseDay
+            Training session data
+        test_day: MouseDay
+            Test session data (used for registered neuron selection)
+        cross_test: bool
+            If True, test on test_day data. If False, test on train_day's registered neurons. 
+        """
+        X_train_day = train_day.get_trimmed_spks(reg_key=test_day.day)
+        y_train_day = train_day.get_trimmed_avg_locs()
+        behavior_labels = train_day.get_trimmed_beh_labels()
 
-    splitter = StratifiedShuffleSplit(n_splits=ntrials, test_size=TEST_SIZE, train_size=1-TEST_SIZE, random_state=42)
-    ridge = RidgeCV(alphas=[0.01, 0.1, 1, 10, 100, 1000], fit_intercept=True)
+        if cross_test:
+            X_test_pool = test_day.get_trimmed_spks(reg_key=train_day.day)
+            y_test_pool= test_day.get_trimmed_avg_locs()
 
-    for i, (train_idcs, test_idcs) in enumerate(splitter.split(X, beh_labels)):
-        print("Fold: ", i)
-        X_train = X[train_idcs]
-        y_train = y[train_idcs]
+        logger.info(f"Training on {train_day.day}, registered neurons: {X_train_day.shape[1]}")
 
-        if (cross_test):
-            X_test = X_cross_day[test_idcs]
-            y_test = y_cross_day[test_idcs]
-        else:
-            X_test = X[test_idcs]
-            y_test = y[test_idcs]
+        splitter = StratifiedShuffleSplit(n_splits=n_trials, test_size=TEST_SIZE, 
+                                          train_size=1-TEST_SIZE, random_state=42)
+        model = super._create_model(model_type="ridge")
+        scores = []
 
-        ridge.fit(X_train, y_train)
+        for fold, (train_idcs, test_idcs) in enumerate(splitter.split(X_train_day, behavior_labels)):
+            logger.info(f"Processing fold {fold+1}/{n_trials}")
+            X_train_fold = X_train_day[train_idcs]
+            y_train_fold = y_train_day[train_idcs]
 
-        score = ridge.score(X_test, y_test)
-        scores.append(score)
-
-    if (cross_test):
-        y_preds = ridge.predict(X_cross_day)
-    else:
-        y_preds = ridge.predict(X)
-
-    if (save_res):
-        # SAVES WITHIN THE TRAIN DAY'S FOLDER
-        if (cross_test):
-            save_label = f"{train_day.day}_x_{test_day.day}"
-        else:
-            save_label = f"registered_general"
-        io.save_decoded_data(train_day.mouseID, train_day.day, scores, y_preds, save_label)
-        io.save_model(train_day.mouseID, train_day.day, ridge, save_label)
-
-    return scores, y_preds
-
-      
-
-def latency_check(mouse_day: MouseDay):
-    print("# of timestamps (calcium): ", mouse_day.cal_ntimestamps)
-    print("# of datapoints (calcium): ", mouse_day.cal_nframes)
-    mouse_day.check_caltime_latency()
-    return 0
-
-def dimensions_check(mouse_day: MouseDay):
-    # Go back and figure out how the lengths differ...and why this func takes a hot sec
-    test_locs = mouse_day.get_trimmed_avg_locs()
-    test_spikes = mouse_day.get_trimmed_spks()
-    test_labels = mouse_day.get_trimmed_beh_labels()
-
-    test_untrimmedlocs = mouse_day.get_all_avg_locations()
-    test_untrimmedspks = mouse_day.cal_spks.T
-    test_untrimmed_labels = mouse_day.get_beh_labels()
-
-    print("No Trim Locs: ", test_untrimmedlocs.shape)
-    print("No Trim Spikes: ", test_untrimmedspks.shape)
-    print("No Trim Labels: ", len(test_untrimmed_labels))
-
-    print("Trimmed Locs: ", test_locs.shape)
-    print("Trimmed Spikes: ", test_spikes.shape)
-    print("Trimmed labels: ", len(test_labels))
-    return 0
-
-def md_run(mouse_day: MouseDay, save_status=False):
-    """
-    Just to make sure all the mice are mice-ing. 
-    Runs EVERYTHING.
-    Saves if we specify. 
-    """
-    # latency_check(mouse_day)
-    # dimensions_check(mouse_day)
-
-    # fig = myplot.plot_interp_test(mouse_day, mouse_day.seg_keys[0])
-    # plt.show()
-
-    decode_general(mouse_day, save_res=save_status)
-    # fig1 = myplot.plot_kin_predictions(mouse_day)
-
-    decode_behaviors(mouse_day, save_res=save_status)
-    # fig2 = myplot.plot_model_performance_swarm(mouse_day)
-
-    decode_behaviors_with_general(mouse_day, save_res=save_status)
-    # fig3 = myplot.plot_general_performance_by_beh(mouse_day)
-
-    decode_by_cell(mouse_day, save_res=save_status)
-    # fig4 = myplot.plot_cell_performance_swarm(mouse_day)
-
-    for beh in LEARNED:
-        scores, preds = decode_behaviors_with_class(mouse_day, train_class=BEH_CLASSES["learned"], test_class=BEH_CLASSES[beh], mode="in_class", save_res=save_status)
-        scores1, preds1 = decode_behaviors_with_class(mouse_day, train_class=BEH_CLASSES["natural"], test_class=BEH_CLASSES[beh], mode="cross_class", save_res=save_status)
-
-    for beh in NATURAL:
-        scores, preds = decode_behaviors_with_class(mouse_day, train_class=BEH_CLASSES["natural"], test_class=BEH_CLASSES[beh], mode="in_class", save_res=save_status)
-        scores1, preds1 = decode_behaviors_with_class(mouse_day, train_class=BEH_CLASSES["learned"], test_class=BEH_CLASSES[beh], mode="cross_class", save_res=save_status)
-
-    # fig5 = myplot.plot_performance_swarm(mouse_day, modes=myplot.IN_CLASS_MODE, mode_type="In-Class")
-    # fig6 = myplot.plot_performance_swarm(mouse_day, modes=myplot.CROSS_CLASS_MODE, mode_type="Cross-Class")
-
-    # plt.show()
-    return 0
-
-def decode_across_days(mouse_days: list[MouseDay]):
-    for curr_day in mouse_days:
-        for cross_day in mouse_days:
-
-            if curr_day != cross_day:
-                    s, p = decode_crossday_general(train_day=curr_day, test_day=cross_day, cross_test=True, save_res=True)
-                    print(f"{curr_day.day} x {cross_day.day} scores: ", s)
+            if cross_test:
+                X_test_fold = X_test_pool[test_idcs]
+                y_test_fold = y_test_pool[test_idcs]
             else:
-                # just train a general model on the day's registered neurons
-                s, p = decode_crossday_general(train_day=curr_day, test_day=cross_day, cross_test=False, save_res=True)
-                print(f"{curr_day.day}'s registered neuron scores: ", s)
+                X_test_fold = X_train_day[test_idcs]
+                y_test_fold = y_train_day[test_idcs]
+
+            model.fit(X_train_fold, y_train_fold)
+            scores.append(model.score(X_test_fold, y_test_fold))
+
+        # Generate full predictions (sanity check)
+        if cross_test:
+            y_predictions = model.predict(X_test_pool)
+        else:
+            y_predictions = model.predict(X_train_day)
+
+        if save_results:
+            save_label = f"{train_day.day}_x_{test_day.day}" if cross_test else "registered_general"
+            io.save_decoded_data(train_day.mouseID, train_day.day, scores, y_predictions, save_label)
+            io.save_model(train_day.mouseID, train_day.day, model, save_label)
+
+        return scores, y_predictions
+    
+    def decode_multi_days(self, mouse_days: list[MouseDay]):
+        for curr_day in mouse_days:
+            for cross_day in mouse_days:
+                if curr_day != cross_day:
+                        s, p = self.decode_two_days(train_day=curr_day, test_day=cross_day, cross_test=True, save_res=True)
+                else:
+                    # just train a general model on the day's registered neurons
+                    s, p = self.decode_two_days(train_day=curr_day, test_day=cross_day, cross_test=False, save_res=True)
 
 
-def decode_gen_with_lag(mouse_day: MouseDay):
-    for i in range(1, 9):
-        s, p = decode_general(mouse_day, lag=i, save_res=True)
-        print(s)
+def run_comprehensive_analysis(mouse_day: MouseDay, decoder: CortexDecoder, save_results: bool = False):
+    """
+    Execute complete decoding analysis pipeline for a single experimental session.
+    
+    Parameters
+    ----------
+    mouse_day : MouseDay
+        Experimental session data
+    save_results : bool
+        Whether to save analysis outputs
+    """
+    
+    print(f"Running comprehensive analysis for {mouse_day.mouseID}, {mouse_day.day}")
+    print("=" * 60)
+    
+    # 1. General population decoding
+    print("\n1. General Population Decoding")
+    general_scores, _ = decoder.decode_general_population(mouse_day, 
+                                                    save_results=save_results)
+    print(f"General decoding R^2 = \
+          {np.mean(general_scores):.3f} ± {np.std(general_scores):.3f}")
+    
+    # 2. Behavior-specific decoding
+    print("\n2. Behavior-Specific Decoding")
+    behavior_scores, _ = decoder.decode_by_behavior(mouse_day, 
+                                                    save_results=save_results)
+    for behavior_id, scores in enumerate(behavior_scores):
+        print(f"{behavior_id}th behavior R^2 = {np.mean(scores)} ± {np.std(scores)}")
 
-def decode_beh_with_lag(mouse_day: MouseDay):
-    for i in range(1, 9):
-        s, p  = decode_behaviors(mouse_day, lag=i, save_res=True)
-        print(s)
+    # 3. Cross-behavioral generalization
+    print("\n3. Cross-Behavioral Generalization")
+    cross_scores = decoder.decode_cross_behaviors(mouse_day, 
+                                                   save_results=save_results)
+    for behavior_id in cross_scores:
+        print(f"{behavior_id}th behavior R^2 = \
+              {np.mean(behavior_scores[behavior_id])} \
+              ± {np.std(behavior_scores[behavior_id])}")
+    
+    # 4. Cell type comparison
+    print("\n4. Cell Type Analysis")
+    inh_scores, exc_scores, _, _ = decoder.decode_by_cell_type(mouse_day, save_results=save_results)
+    print(f"Inhibitory R^2 = {np.mean(inh_scores):.3f} ± {np.std(inh_scores):.3f}")
+    print(f"Excitatory R^2 = {np.mean(exc_scores):.3f} ± {np.std(exc_scores):.3f}")
+    
+    # 5. Behavioral class analysis
+    print("\n5. Behavioral Class Analysis")
+    for class_name in ['learned', 'natural']:
+        class_scores, _ = decoder.decode_behavioral_class(mouse_day, class_name, save_results=save_results)
+        print(f"{class_name.capitalize()} behaviors R^2 = {np.mean(class_scores):.3f} ± {np.std(class_scores):.3f}")
+    
+    print("\nAnalysis complete!")
+    return {
+        'general': general_scores,
+        'behaviors': behavior_scores,
+        'cross_behavioral': cross_scores,
+        'inhibitory': inh_scores,
+        'excitatory': exc_scores
+    }
 
-def decode_class_with_lag(mouse_day: MouseDay, class_type: str):
-    for i in range(1, 9):
-        s, p = decode_by_class(mouse_day, beh_class=class_type, lag=i, save_res=True)
-        print(s)
+
+def run_lag_analysis(mouse_day: MouseDay, decoder: CortexDecoder, max_lag: int = 8):
+    """
+    Analyze the effect of calcium indicator temporal lag on decoding performance.
+    
+    Parameters
+    ----------
+    mouse_day : MouseDay
+        Experimental session data
+    decoder : CortexDecoder
+        Decoder instance
+    max_lag : int
+        Maximum lag to test (in frames)
+    """
+    print("Running calcium lag analysis...")
+    
+    lag_results = {
+        'general': {},
+        'behaviors': {},
+        'learned_class': {},
+        'natural_class': {}
+    }
+    
+    for lag in range(1, max_lag + 1):
+        print(f"\nAnalyzing lag = {lag} frames")
+        
+        # General population decoding
+        scores, _ = decoder.decode_general_population(mouse_day, lag=lag, save_results=True)
+        lag_results['general'][lag] = scores
+        print(f"General Scores: {scores}")
+
+        # Individual behavior decoding
+        scores, _ = decoder.decode_by_behavior(mouse_day, lag=lag, save_results=True)
+        for behavior_id, scores in enumerate(scores):
+            print(f"{behavior_id}th behavior's scores: {scores}")
+
+        # Behavioral class decoding
+        for class_name in ['learned', 'natural']:
+            scores, _ = decoder.decode_behavioral_classes(mouse_day, class_name, lag=lag, save_results=True)
+            print(f"{class_name} scores: {scores}")
+            lag_results[f'{class_name}_class'][lag] = scores
+    
+    return lag_results
+
+def diagnose_data_quality(mouse_day: MouseDay):
+    """Diagnose potential numerical issues in the data."""
+    X = mouse_day.get_trimmed_spks()
+    y = mouse_day.get_trimmed_avg_locs()
+    
+    print("=== DATA QUALITY DIAGNOSTICS ===")
+    print(f"Neural data (X): {X.shape}")
+    print(f"  - Zero percentage: {100 * np.mean(X == 0):.1f}%")
+    print(f"  - Min/Max: {X.min():.6f} / {X.max():.6f}")
+    print(f"  - Mean/Std: {X.mean():.6f} / {X.std():.6f}")
+    
+    # Check for constant features
+    X_var = np.var(X, axis=0)
+    zero_var_features = np.sum(X_var == 0)
+    low_var_features = np.sum(X_var < 1e-8)
+    print(f"  - Zero variance features: {zero_var_features}")
+    print(f"  - Low variance features (< 1e-8): {low_var_features}")
+    
+    print(f"\nPosition data (y): {y.shape}")
+    print(f"  - Min/Max: {y.min():.6f} / {y.max():.6f}")
+    print(f"  - Mean/Std: {y.mean():.6f} / {y.std():.6f}")
+    
+    # Check condition number
+    try:
+        cond_num = np.linalg.cond(X.T @ X)
+        print(f"  - Condition number of X'X: {cond_num:.2e}")
+        if cond_num > 1e12:
+            print("    WARNING: Matrix is very ill-conditioned!")
+    except:
+        print("  - Could not compute condition number")
+    
+    return {
+        'zero_percentage': np.mean(X == 0),
+        'zero_var_features': zero_var_features,
+        'low_var_features': low_var_features,
+        'condition_number': cond_num if 'cond_num' in locals() else None
+    }
+
+
 
 if __name__ == "__main__":
+    mouse_id = 'mouse25'
+    session_dates = [
+        '20240420', '20240421', '20240422', '20240423', '20240424', 
+        '20240425', '20240428', '20240429', '20240430', '20240501', 
+        '20240502', '20240503'
+    ]
+    
+    # Single session analysis
+    decoder = CortexDecoder()
+    test_session = MouseDay(mouse_id, session_dates[5])
 
-    mouseIDs = ['mouse25']
-    days = ['20240420', '20240421', '20240422', '20240423', '20240424', '20240425', '20240428', '20240429', '20240430', '20240501' ,'20240502', '20240503']
-    test_day = MouseDay("mouse25", "20240425")
-    decode_beh_with_lag(test_day)
-    decode_class_with_lag(test_day, "learned")
-    decode_class_with_lag(test_day, "natural")
+    results = run_comprehensive_analysis(test_session, decoder, save_results=True)
+    
+    # Lag analysis
+    # lag_results = run_lag_analysis(test_session, decoder, max_lag=8)
+    
+    print("All analyses completed successfully!")
