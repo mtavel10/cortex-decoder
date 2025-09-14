@@ -7,9 +7,6 @@ This file provides examples of how to use the interpolation functions provided b
 For now, there's one specific type of interpolating going on: interpolating average kinematic location per calcium time bin.  
     s.t. you have two xy pairs per calcium time bin (one per camera). 
 
-If I don't procrastinate, I will soon add more functions that allow us to interpolate all 15 key-points...
-
-
 Within a folder called "neuro-behavior-decoder", you'll need to download the following files:
     src/IO.py   <- holds all the system functions for loading/saving data
     mouse.py    <- holds the MouseDay class
