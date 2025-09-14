@@ -1,5 +1,5 @@
 import numpy as np
-import src.IO as io
+import IO as io
 from mouse import MouseDay
 
 """

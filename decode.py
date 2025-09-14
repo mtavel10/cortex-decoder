@@ -139,9 +139,9 @@ class CortexDecoder:
             Position predictions for all timepoints
         """
         # Load and preprocess data
-        X = mouse_day.get_trimmed_spks()
-        y = mouse_day.get_trimmed_avg_locs()
-        behavior_labels = mouse_day.get_trimmed_beh_labels()
+        X = mouse_day.get_neural_data()
+        y = mouse_day.get_locations()
+        behavior_labels = mouse_day.get_behavior_labels()
 
         X, y, behavior_labels = self._apply_calcium_lag(X, y, behavior_labels, lag)
 
@@ -195,9 +195,9 @@ class CortexDecoder:
         all_predictions: List[np.ndarray]
             Predictions for each behavior
         """
-        X = mouse_day.get_trimmed_spks()
-        y = mouse_day.get_trimmed_avg_locs()
-        behavior_labels = mouse_day.get_trimmed_beh_labels()
+        X = mouse_day.get_neural_data()
+        y = mouse_day.get_locations()
+        behavior_labels = mouse_day.get_behavior_labels()
 
         X, y, behavior_labels = self._apply_calcium_lag(X, y, behavior_labels, lag)
 
@@ -260,9 +260,9 @@ class CortexDecoder:
         scores_by_behavior: Dict[int, List[float]]
             R^2 scores for each behavior across CV folds
         """
-        X = mouse_day.get_trimmed_spks()
-        y = mouse_day.get_trimmed_avg_locs()
-        behavior_labels = mouse_day.get_trimmed_beh_labels()
+        X = mouse_day.get_neural_data()
+        y = mouse_day.get_locations()
+        behavior_labels = mouse_day.get_behavior_labels()
         
         # 1. Create balanced test sets for each behavior
         valid_behaviors = {k: v for k, v in mouse_day.BEHAVIOR_LABELS.items() if k != 6}
@@ -355,9 +355,9 @@ class CortexDecoder:
             Position predictions from excitatory neurons
         """
         cell_labels = mouse_day.cell_labels
-        X = mouse_day.get_trimmed_spks()
-        y = mouse_day.get_trimmed_avg_locs()
-        behavior_labels = mouse_day.get_trimmed_beh_labels()
+        X = mouse_day.get_neural_data()
+        y = mouse_day.get_locations()
+        behavior_labels = mouse_day.get_behavior_labels()
 
         # Split neural data by cell type
         X_inhibitory = X[:, cell_labels]
@@ -428,9 +428,9 @@ class CortexDecoder:
         behavior_class: str
             Either "learned" or "natural"
         """
-        X = mouse_day.get_trimmed_spks()
-        y = mouse_day.get_trimmed_avg_locs() 
-        behavior_labels = mouse_day.get_trimmed_beh_labels()
+        X = mouse_day.get_neural_data()
+        y = mouse_day.get_locations()
+        behavior_labels = mouse_day.get_behavior_labels()
 
         X, y, behavior_labels = self._apply_calcium_lag(X, y, behavior_labels, lag)
 
@@ -512,9 +512,9 @@ class CortexDecoder:
         predictions: np.ndarray
             Full prediction array
         """
-        X = mouse_day.get_trimmed_spks()
-        y = mouse_day.get_trimmed_avg_locs() 
-        behavior_labels = mouse_day.get_trimmed_beh_labels()
+        X = mouse_day.get_neural_data()
+        y = mouse_day.get_locations()
+        behavior_labels = mouse_day.get_behavior_labels()
 
         behavior_mapping: dict[int, str] = mouse_day.BEHAVIOR_LABELS
         logger.info(f"Training on: {[behavior_mapping[b] for b in train_behaviors]}")
@@ -669,13 +669,13 @@ class CrossDayDecoder(CortexDecoder):
         cross_test: bool
             If True, test on test_day data. If False, test on train_day's registered neurons. 
         """
-        X_train_day = train_day.get_trimmed_spks(reg_key=test_day.day)
-        y_train_day = train_day.get_trimmed_avg_locs()
-        behavior_labels = train_day.get_trimmed_beh_labels()
+        X_train_day = train_day.get_neural_data(registered_key=test_day.day)
+        y_train_day = train_day.get_locations()
+        behavior_labels = train_day.get_behavior_labels()
 
         if cross_test:
-            X_test_pool = test_day.get_trimmed_spks(reg_key=train_day.day)
-            y_test_pool= test_day.get_trimmed_avg_locs()
+            X_test_pool = test_day.get_neural_data(registered_key=train_day.day)
+            y_test_pool= test_day.get_locations()
 
         logger.info(f"Training on {train_day.day}, registered neurons: {X_train_day.shape[1]}")
 
@@ -827,8 +827,8 @@ def run_lag_analysis(mouse_day: MouseDay, decoder: CortexDecoder, max_lag: int =
 
 def diagnose_data_quality(mouse_day: MouseDay):
     """Diagnose potential numerical issues in the data."""
-    X = mouse_day.get_trimmed_spks()
-    y = mouse_day.get_trimmed_avg_locs()
+    X = mouse_day.get_neural_data()
+    y = mouse_day.get_locations()
     
     print("=== DATA QUALITY DIAGNOSTICS ===")
     print(f"Neural data (X): {X.shape}")
